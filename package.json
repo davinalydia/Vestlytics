@@ -1,0 +1,20 @@
+{
+  "name": "vestlytics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "",
+  "main": "index.js",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:server": "npm run dev -w apps/server",
+    "dev": "npm run dev --workspaces --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
