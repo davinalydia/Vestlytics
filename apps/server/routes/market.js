@@ -1,177 +1,151 @@
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
-import csv from 'csv-parser';
+import { createClient } from '@supabase/supabase-js';
 
 const router = express.Router();
 
-// Set path buat baca file dataset CSV dari folder ai-research
-const csvFilePath = path.join(
-  process.cwd(),
-  '..',
-  '..',
-  'ai-research',
-  'data',
-  'stock_data',
-  'lq45_clean_dataset.csv',
-);
+// Inisialisasi koneksi Supabase (Pastikan environment variables sudah di-set)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY; 
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 1. ENDPOINT: GET DATA FEED SAHAM (Buat umpan market umum pake data BBCA)
-router.get('/feed', (req, res) => {
-  const feedData = [];
-
-  // Cek file CSV-nya ada apa nggak
-  if (!fs.existsSync(csvFilePath)) {
-    return res.status(404).json({ error: 'Dataset LQ45 tidak ditemukan.' });
-  }
-
-  // Ticker default buat nampilin feed market
+// 1. ENDPOINT: GET DATA FEED SAHAM (Menyediakan data market umum, default: BBCA)
+router.get('/feed', async (req, res) => {
   const defaultTicker = 'BBCA';
 
-  // Baca dan proses file CSV per baris
-  fs.createReadStream(csvFilePath)
-    .pipe(csv())
-    .on('data', (row) => {
-      // Tangkep nama ticker dan hapus format '.JK' dari Yahoo Finance
-      const rawTicker = row.Ticker || row.ticker || row.Symbol;
-      const cleanTicker = rawTicker
-        ? rawTicker.replace('.JK', '').toUpperCase()
-        : '';
+  try {
+    // Mengambil 15 baris data terakhir dari tabel market_data untuk ticker default
+    const { data, error } = await supabase
+      .from('market_data')
+      .select('Date, Close, Volume, Ticker')
+      // Menggunakan fungsi ilike untuk mencocokkan format ticker (misal: 'BBCA' atau 'BBCA.JK')
+      .ilike('Ticker', `${defaultTicker}%`)
+      .order('Date', { ascending: false })
+      .limit(15);
 
-      // Kalo tickernya match sama BBCA, masukin ke array
-      if (cleanTicker === defaultTicker) {
-        feedData.push({
-          date: row.Date || row.date,
-          price: parseFloat(row.Close || row.close || 0),
-          volume: parseFloat(row.Volume || row.volume || 0),
-        });
-      }
-    })
-    .on('end', () => {
-      // Ambil 15 data terakhir aja biar chart frontend ga kepanjangan
-      const recentData = feedData.slice(-15);
+    if (error) throw error;
 
-      res.json({
-        success: true,
-        market_data: recentData,
-      });
-    })
-    .on('error', (error) => {
-      res.status(500).json({
-        error: 'Gagal memproses data CSV untuk feed pasar.',
-        details: error.message,
-      });
+    // Format ulang struktur data agar sesuai dengan kebutuhan frontend
+    const formattedData = data
+      .map((row) => ({
+        date: row.Date,
+        price: parseFloat(row.Close || 0),
+        volume: parseInt(row.Volume || 0, 10),
+      }))
+      .reverse(); // Reverse array agar data terurut dari tanggal terlama ke terbaru untuk chart
+
+    res.json({
+      success: true,
+      market_data: formattedData,
     });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Gagal mengambil data feed dari database.',
+      details: error.message,
+    });
+  }
 });
 
-// 2. ENDPOINT: GET RAW DATASET (Convert CSV mentah ke JSON buat research)
-router.get('/ds-research', (req, res) => {
-  const results = [];
+// 2. ENDPOINT: GET RAW DATASET (Mengambil data mentah untuk keperluan riset analitik)
+router.get('/ds-research', async (req, res) => {
+  try {
+    // Membatasi jumlah data yang ditarik untuk mencegah overload pada server
+    const { data, error } = await supabase
+      .from('market_data')
+      .select('*')
+      .limit(5000);
 
-  if (!fs.existsSync(csvFilePath)) {
-    return res.status(404).json({
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      total_records: data.length,
+      research_data: data,
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      error: 'File dataset tidak ditemukan di server.',
+      error: 'Terjadi kesalahan saat melakukan query dataset analitik.',
+      details: error.message,
     });
   }
-
-  fs.createReadStream(csvFilePath)
-    .pipe(csv())
-    .on('data', (data) => results.push(data))
-    .on('end', () =>
-      res.json({
-        success: true,
-        total_records: results.length,
-        research_data: results,
-      }),
-    )
-    .on('error', (error) =>
-      res.status(500).json({
-        success: false,
-        error: 'Terjadi error saat membaca aliran data CSV.',
-        details: error.message,
-      }),
-    );
 });
 
-// 3. ENDPOINT: GET ANALISIS PASAR & GRAFIK (Gabungan historis CSV + dummy AI)
-router.get('/analysis/:ticker', (req, res) => {
+// 3. ENDPOINT: GET ANALISIS PASAR & GRAFIK (Kombinasi data historis DB dan simulasi insight AI)
+router.get('/analysis/:ticker', async (req, res) => {
   const ticker = req.params.ticker.toUpperCase();
-  const chartData = [];
 
-  if (!fs.existsSync(csvFilePath)) {
-    return res.status(404).json({ error: 'Dataset LQ45 tidak ditemukan.' });
-  }
+  try {
+    // Mengambil seluruh riwayat harga berdasarkan ticker yang direquest
+    const { data, error } = await supabase
+      .from('market_data')
+      .select('Date, Close, Ticker')
+      .ilike('Ticker', `${ticker}%`)
+      .order('Date', { ascending: true });
 
-  fs.createReadStream(csvFilePath)
-    .pipe(csv())
-    .on('data', (row) => {
-      // Bersihin ticker dari embel-embel '.JK' biar gampang dicocokin
-      const rawTicker = row.Ticker || row.ticker || row.Symbol;
-      const cleanTicker = rawTicker
-        ? rawTicker.replace('.JK', '').toUpperCase()
-        : '';
+    if (error) throw error;
 
-      // Filter baris data sesuai ticker yang diminta dari URL params
-      if (cleanTicker === ticker) {
-        chartData.push({
-          date: row.Date || row.date,
-          price: parseFloat(row.Close || row.close || 0),
+    if (!data || data.length === 0) {
+      return res
+        .status(404)
+        .json({
+          error: `Data historis untuk saham ${ticker} tidak ditemukan.`,
         });
-      }
-    })
-    .on('end', () => {
-      // Ambil harga terakhir buat dijadiin current price
-      const currentPrice =
-        chartData.length > 0 ? chartData[chartData.length - 1].price : 9450;
+    }
 
-      // Racik data historis asli sama prediksi AI dummy buat frontend
-      const marketAnalysisData = {
-        ticker: ticker,
-        current_price: currentPrice,
-        chart_historical: chartData,
-        prediction_breakdown: {
-          short_term_1d: { price: currentPrice * 1.01, change_pct: 0.74 },
-          short_term_7d: { price: currentPrice * 1.02, change_pct: 2.43 },
-          long_term_1m: { price: currentPrice * 1.04, change_pct: 4.76 },
-          long_term_6m: { price: currentPrice * 0.96, change_pct: -3.7 },
-        },
-        ai_insight: {
-          text: `${ticker} is showing short-term bullish momentum based on recent trading volume. Watch for key support levels.`,
-          tags: ['Bullish ST', 'Hold / Accumulation'],
-        },
-      };
+    const chartData = data.map((row) => ({
+      date: row.Date,
+      price: parseFloat(row.Close || 0),
+    }));
 
-      res.json({ success: true, data: marketAnalysisData });
-    })
-    .on('error', (error) => {
-      res.status(500).json({
-        error: 'Gagal mengekstrak data grafik dari CSV.',
-        details: error.message,
-      });
+    // Mengambil harga penutupan terakhir sebagai harga saat ini (current price)
+    const currentPrice = chartData[chartData.length - 1].price;
+
+    // Menggabungkan data historis asli dengan mock-up prediksi AI untuk frontend
+    const marketAnalysisData = {
+      ticker: ticker,
+      current_price: currentPrice,
+      chart_historical: chartData,
+      prediction_breakdown: {
+        short_term_1d: { price: currentPrice * 1.01, change_pct: 0.74 },
+        short_term_7d: { price: currentPrice * 1.02, change_pct: 2.43 },
+        long_term_1m: { price: currentPrice * 1.04, change_pct: 4.76 },
+        long_term_6m: { price: currentPrice * 0.96, change_pct: -3.7 },
+      },
+      ai_insight: {
+        text: `${ticker} is showing short-term bullish momentum based on recent trading volume. Watch for key support levels.`,
+        tags: ['Bullish ST', 'Hold / Accumulation'],
+      },
+    };
+
+    res.json({ success: true, data: marketAnalysisData });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Gagal mengekstrak data grafik dari database.',
+      details: error.message,
     });
+  }
 });
 
-// 4. ENDPOINT: GET DAFTAR SAHAM (Buat list dropdown/modal search di frontend)
-router.get('/available-stocks', (req, res) => {
-  // Pake Map biar list sahamnya ga duplikat
-  const uniqueStocks = new Map();
+// 4. ENDPOINT: GET DAFTAR SAHAM (Menyediakan list saham untuk fitur dropdown/pencarian di frontend)
+router.get('/available-stocks', async (req, res) => {
+  try {
+    // Mengambil data dari SQL View 'unique_tickers' untuk menghindari limit row 
+    // dan menghasilkan query yang jauh lebih efisien dibandingkan query langsung ke tabel utama
+    const { data, error } = await supabase
+      .from('unique_tickers')
+      .select('Ticker');
 
-  if (!fs.existsSync(csvFilePath)) {
-    return res.status(404).json({ error: 'File dataset tidak ditemukan.' });
-  }
+    if (error) throw error;
 
-  fs.createReadStream(csvFilePath)
-    .pipe(csv())
-    .on('data', (row) => {
-      // Tangkep ticker dan buang format '.JK' biar UI keliatan rapi
-      const rawTicker = row.Ticker || row.ticker || row.Symbol;
-      const cleanTicker = rawTicker
-        ? rawTicker.replace('.JK', '').toUpperCase()
-        : null;
+    // Menggunakan Map untuk memastikan tidak ada duplikasi data saham pada response
+    const uniqueStocks = new Map();
+
+    data.forEach(row => {
+      // Menghilangkan format '.JK' agar nama emiten lebih bersih saat ditampilkan di UI
+      const cleanTicker = row.Ticker ? row.Ticker.replace('.JK', '').toUpperCase() : null;
 
       if (cleanTicker && !uniqueStocks.has(cleanTicker)) {
-        // Bikin harga & persentase random buat dummy UI
+        // Melakukan generate data simulasi (harga dan persentase) untuk kebutuhan visual dummy
         const simulatedPrice = Math.floor(Math.random() * 8000) + 2000;
         const simulatedChange = (Math.random() * 5 - 2).toFixed(1);
 
@@ -181,20 +155,18 @@ router.get('/available-stocks', (req, res) => {
           change_pct: parseFloat(simulatedChange),
         });
       }
-    })
-    .on('end', () => {
-      // Ubah Map jadi Array biasa sebelum dikirim ke client
-      res.json({
-        success: true,
-        stocks: Array.from(uniqueStocks.values()),
-      });
-    })
-    .on('error', (error) => {
-      res.status(500).json({
-        error: 'Terjadi error saat mengambil ketersediaan saham.',
-        details: error.message,
-      });
     });
+
+    res.json({
+      success: true,
+      stocks: Array.from(uniqueStocks.values()),
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Terjadi kesalahan sistem saat mengambil data ketersediaan saham.',
+      details: error.message,
+    });
+  }
 });
 
 export default router;
