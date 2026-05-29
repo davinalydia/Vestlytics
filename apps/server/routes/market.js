@@ -5,7 +5,7 @@ import csv from 'csv-parser';
 
 const router = express.Router();
 
-// Mengarahkan path membaca file dataset mentah dari luar direktori aplikasi server
+// Set path buat baca file dataset CSV dari folder ai-research
 const csvFilePath = path.join(
   process.cwd(),
   '..',
@@ -16,35 +16,39 @@ const csvFilePath = path.join(
   'lq45_clean_dataset.csv',
 );
 
-// 1. ENDPOINT: PENYEDIA DATA PASAR SAHAM (Data Aktual Berdasarkan CSV LQ45)
+// 1. ENDPOINT: GET DATA FEED SAHAM (Buat umpan market umum pake data BBCA)
 router.get('/feed', (req, res) => {
   const feedData = [];
 
-  // Memeriksa ketersediaan file dataset CSV pada direktori
+  // Cek file CSV-nya ada apa nggak
   if (!fs.existsSync(csvFilePath)) {
     return res.status(404).json({ error: 'Dataset LQ45 tidak ditemukan.' });
   }
 
-  // Menetapkan emiten bawaan sebagai representasi umpan pasar umum
+  // Ticker default buat nampilin feed market
   const defaultTicker = 'BBCA';
 
-  // Membaca dan memproses file CSV menggunakan aliran data (stream)
+  // Baca dan proses file CSV per baris
   fs.createReadStream(csvFilePath)
     .pipe(csv())
     .on('data', (row) => {
-      const rowTicker = row.ticker || row.Symbol || row.target_asset;
+      // Tangkep nama ticker dan hapus format '.JK' dari Yahoo Finance
+      const rawTicker = row.Ticker || row.ticker || row.Symbol;
+      const cleanTicker = rawTicker
+        ? rawTicker.replace('.JK', '').toUpperCase()
+        : '';
 
-      // Menyaring data khusus untuk emiten bawaan
-      if (rowTicker && rowTicker.toUpperCase() === defaultTicker) {
+      // Kalo tickernya match sama BBCA, masukin ke array
+      if (cleanTicker === defaultTicker) {
         feedData.push({
-          date: row.date || row.Date || row.tanggal,
-          price: parseFloat(row.close || row.Close || row.price || 0),
-          volume: parseFloat(row.volume || row.Volume || 0), // Mengekstrak data volume apabila tersedia
+          date: row.Date || row.date,
+          price: parseFloat(row.Close || row.close || 0),
+          volume: parseFloat(row.Volume || row.volume || 0),
         });
       }
     })
     .on('end', () => {
-      // Mengambil 15 hari perdagangan terakhir agar visualisasi antarmuka tidak terlalu padat
+      // Ambil 15 data terakhir aja biar chart frontend ga kepanjangan
       const recentData = feedData.slice(-15);
 
       res.json({
@@ -60,14 +64,14 @@ router.get('/feed', (req, res) => {
     });
 });
 
-// 2. ENDPOINT: KONVERSI DAN DISTRIBUSI DATASET RISET (CSV ke JSON)
+// 2. ENDPOINT: GET RAW DATASET (Convert CSV mentah ke JSON buat research)
 router.get('/ds-research', (req, res) => {
   const results = [];
+
   if (!fs.existsSync(csvFilePath)) {
     return res.status(404).json({
       success: false,
-      error:
-        'File dataset analitik tidak ditemukan pada direktori yang dituju.',
+      error: 'File dataset tidak ditemukan di server.',
     });
   }
 
@@ -84,47 +88,44 @@ router.get('/ds-research', (req, res) => {
     .on('error', (error) =>
       res.status(500).json({
         success: false,
-        error: 'Terjadi kegagalan pemrosesan aliran data CSV.',
+        error: 'Terjadi error saat membaca aliran data CSV.',
         details: error.message,
       }),
     );
 });
 
-// 3. ENDPOINT: ANALISIS PASAR DAN VISUALISASI GRAFIK (Kombinasi Data CSV dan Simulasi AI)
+// 3. ENDPOINT: GET ANALISIS PASAR & GRAFIK (Gabungan historis CSV + dummy AI)
 router.get('/analysis/:ticker', (req, res) => {
   const ticker = req.params.ticker.toUpperCase();
-  const chartData = []; // Array untuk menampung data grafik aktual dari file CSV
+  const chartData = [];
 
-  // Memeriksa ketersediaan file dataset
   if (!fs.existsSync(csvFilePath)) {
-    return res
-      .status(404)
-      .json({ error: 'Dataset LQ45 tidak ditemukan di server.' });
+    return res.status(404).json({ error: 'Dataset LQ45 tidak ditemukan.' });
   }
 
-  // Membaca file CSV untuk mengekstrak data historis harga
   fs.createReadStream(csvFilePath)
     .pipe(csv())
     .on('data', (row) => {
-      // Menyesuaikan 'ticker' dengan nama kolom pada file CSV (contoh: 'Symbol', 'Kode', dll.)
-      const rowTicker = row.ticker || row.Symbol || row.target_asset;
+      // Bersihin ticker dari embel-embel '.JK' biar gampang dicocokin
+      const rawTicker = row.Ticker || row.ticker || row.Symbol;
+      const cleanTicker = rawTicker
+        ? rawTicker.replace('.JK', '').toUpperCase()
+        : '';
 
-      // Menyaring baris data yang sesuai dengan parameter emiten yang diminta oleh client
-      if (rowTicker && rowTicker.toUpperCase() === ticker) {
+      // Filter baris data sesuai ticker yang diminta dari URL params
+      if (cleanTicker === ticker) {
         chartData.push({
-          // Menyesuaikan 'date' dan 'close' dengan tajuk (header) pada file CSV
-          date: row.date || row.Date || row.tanggal,
-          price: parseFloat(row.close || row.Close || row.price || 0),
+          date: row.Date || row.date,
+          price: parseFloat(row.Close || row.close || 0),
         });
       }
     })
     .on('end', () => {
-      // Mengambil harga terakhir dari grafik historis sebagai harga saat ini
+      // Ambil harga terakhir buat dijadiin current price
       const currentPrice =
         chartData.length > 0 ? chartData[chartData.length - 1].price : 9450;
 
-      // Menggabungkan data historis asli dengan prediksi AI tersimulasi
-      // Ini masih dummy calculation
+      // Racik data historis asli sama prediksi AI dummy buat frontend
       const marketAnalysisData = {
         ticker: ticker,
         current_price: currentPrice,
@@ -151,37 +152,38 @@ router.get('/analysis/:ticker', (req, res) => {
     });
 });
 
-// 4. ENDPOINT: MENGAMBIL DAFTAR SAHAM UNTUK MODAL PENCARIAN
+// 4. ENDPOINT: GET DAFTAR SAHAM (Buat list dropdown/modal search di frontend)
 router.get('/available-stocks', (req, res) => {
-  // Menggunakan struktur Map untuk menyimpan daftar saham unik agar tidak ada duplikasi
+  // Pake Map biar list sahamnya ga duplikat
   const uniqueStocks = new Map();
 
   if (!fs.existsSync(csvFilePath)) {
-    return res
-      .status(404)
-      .json({ error: 'File dataset LQ45 tidak ditemukan.' });
+    return res.status(404).json({ error: 'File dataset tidak ditemukan.' });
   }
 
-  // Membaca dataset CSV untuk mengumpulkan daftar emiten yang tersedia
   fs.createReadStream(csvFilePath)
     .pipe(csv())
     .on('data', (row) => {
-      const ticker = row.ticker || row.Symbol || row.target_asset;
+      // Tangkep ticker dan buang format '.JK' biar UI keliatan rapi
+      const rawTicker = row.Ticker || row.ticker || row.Symbol;
+      const cleanTicker = rawTicker
+        ? rawTicker.replace('.JK', '').toUpperCase()
+        : null;
 
-      if (ticker && !uniqueStocks.has(ticker)) {
-        // Simulasi nominal harga dan persentase perubahan untuk estetika UI frontend
+      if (cleanTicker && !uniqueStocks.has(cleanTicker)) {
+        // Bikin harga & persentase random buat dummy UI
         const simulatedPrice = Math.floor(Math.random() * 8000) + 2000;
         const simulatedChange = (Math.random() * 5 - 2).toFixed(1);
 
-        uniqueStocks.set(ticker, {
-          ticker: ticker.toUpperCase(),
+        uniqueStocks.set(cleanTicker, {
+          ticker: cleanTicker,
           price: simulatedPrice,
           change_pct: parseFloat(simulatedChange),
         });
       }
     })
     .on('end', () => {
-      // Mengonversi struktur Map menjadi Array sebelum dikirim kepada client
+      // Ubah Map jadi Array biasa sebelum dikirim ke client
       res.json({
         success: true,
         stocks: Array.from(uniqueStocks.values()),
@@ -189,7 +191,7 @@ router.get('/available-stocks', (req, res) => {
     })
     .on('error', (error) => {
       res.status(500).json({
-        error: 'Terjadi kesalahan saat memproses data ketersediaan saham.',
+        error: 'Terjadi error saat mengambil ketersediaan saham.',
         details: error.message,
       });
     });
