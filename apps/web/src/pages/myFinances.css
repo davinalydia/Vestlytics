@@ -1,0 +1,362 @@
+.finances-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 3rem;
+}
+
+/* Tabs */
+.tabs-container {
+  display: inline-flex;
+  background-color: #f1f5f9;
+  padding: 0.25rem;
+  border-radius: 9999px;
+  margin-bottom: 0.5rem;
+}
+
+.tab-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background-color: #bae6fd; /* light blue */
+  color: #0369a1;
+}
+
+/* Grid Layouts */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .profile-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.assets-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .assets-grid {
+    grid-template-columns: 1fr 1.2fr;
+  }
+}
+
+.flex-col-gap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Financial Profile Form */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.form-input-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 0.75rem;
+  transition: border-color 0.2s;
+}
+
+.form-input-wrapper:focus-within {
+  border-color: #38bdf8;
+}
+
+.form-prefix {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin-right: 0.5rem;
+}
+
+.form-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0.6rem 0;
+  font-size: 0.95rem;
+  color: #334155;
+  outline: none;
+  width: 100%;
+}
+
+.submit-btn {
+  background-color: #38bdf8;
+  color: white;
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Asset Categorization */
+.asset-cat-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.asset-cat-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.asset-cat-name {
+  width: 100px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.asset-cat-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+}
+
+.asset-cat-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.asset-cat-pct {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-left: 0.5rem;
+}
+
+/* Dark Table */
+.dark-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.dark-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: #64748b;
+  font-weight: 500;
+  border-bottom: 1px solid #1e293b;
+}
+
+.dark-table td {
+  padding: 1rem;
+  color: #cbd5e1;
+  border-bottom: 1px solid #1e293b;
+}
+
+.dark-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Circular Health Score */
+.health-score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.circular-score-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 1rem;
+}
+
+.circular-score-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-score-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #10b981;
+  line-height: 1;
+}
+
+.circular-score-sub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.health-status-text {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  margin-bottom: 1.5rem;
+}
+
+.health-metrics-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding-top: 1rem;
+  border-top: 1px solid #1e293b;
+}
+
+.health-metric-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.health-metric-val {
+  font-size: 0.85rem;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.health-metric-label {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+/* Financial Targets */
+.target-item {
+  background-color: #1e293b;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.target-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.target-title {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.target-badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background-color: #10b98120;
+  color: #10b981;
+}
+.target-badge.behind {
+  background-color: #ef444420;
+  color: #ef4444;
+}
+
+.target-bar-bg {
+  height: 4px;
+  background-color: #0f172a;
+  border-radius: 2px;
+  margin-bottom: 0.5rem;
+}
+.target-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background-color: #10b981;
+}
+.target-bar-fill.behind {
+  background-color: #ef4444;
+}
+
+.target-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Portfolio Risk Metrics */
+.risk-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.risk-metric-box {
+  background-color: #1e293b;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.risk-metric-title {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.risk-metric-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.risk-metric-sub {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.allocation-target-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.alloc-segment {
+  height: 100%;
+}

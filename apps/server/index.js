@@ -7,6 +7,7 @@ import portfolioRoutes from './routes/portfolio.js';
 import marketRoutes from './routes/market.js';
 import consultantRoutes from './routes/dummyInsight.js';
 import labRoutes from './routes/lab.js';
+import authRoutes from './routes/auth.js';
 
 // Memuat konfigurasi environment
 dotenv.config();
@@ -27,6 +28,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/consultant', consultantRoutes);
 app.use('/api/lab', labRoutes);
+app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT || 5000;
 

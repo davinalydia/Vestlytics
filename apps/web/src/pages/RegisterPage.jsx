@@ -1,14 +1,53 @@
-import React, { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Logo } from '../components/Logo';
+import { Modal } from '../components/Modal';
+import { UserFinancialContext } from '../context/UserFinancialContext';
+import { api } from '../services/api';
+
+const TermsOfServiceContent = () => (
+  <>
+    <h3>General Nature of the Platform</h3>
+    <p>Welcome to Vestlytics. Vestlytics is an AI-powered Investment Portfolio Analyzer and financial health tracker designed specifically as an educational Decision Support System. By using our service, you agree that Vestlytics is built to bridge the gap between market trends and personal financial awareness to help you build a healthy financial foundation before investing.</p>
+    
+    <h3>No Financial Advice or Broker Integration</h3>
+    <p>Vestlytics is not a financial advisor. The platform utilizes Deep Learning models (LSTM/GRU) to analyze historical data and predict stock trends. Vestlytics does not support direct integration with stock broker systems, and we do not execute live transactions on your behalf. You are solely responsible for any investment decisions you make.</p>
+    
+    <h3>Simulations and Predictive Analytics</h3>
+    <p>Features such as the Strategy Lab provide "What If" simulations based on parameters you input, including Expected Annual Return, Risk Level, and Monthly DCA (Dollar Cost Averaging) contributions. Projections shown for Bull Market, Base Case, and Bear Market scenarios are estimates intended for educational planning and do not guarantee future market performance.</p>
+  </>
+);
+
+const PrivacyPolicyContent = () => (
+  <>
+    <h3>Information We Collect</h3>
+    <p>To provide you with highly personalized AI insights, Vestlytics collects information during the 3-Step Onboarding process and ongoing application use. The data we collect includes: Basic Information (First name, last name, email address, and phone number), Financial Profile (Monthly income, monthly expenses, total debt, and the amount of your saved emergency fund), Portfolio Data (Your current asset allocations across market instruments).</p>
+
+    <h3>How We Use Your Data</h3>
+    <p>Your financial data is never used to judge you, but rather to evaluate your "Financial Awareness". We process your data through our Integrated Cashflow Engine to calculate your Financial Health Score, Net Savings Rate, and your specific Risk Match. This allows our AI Consultant to generate context-aware advice tailored exclusively to your wallet's health and risk capacity.</p>
+    <p>Vestlytics applies strict risk management strategies, including the use of local data storage practices to ensure environment consistency and secure data handling.</p>
+
+    <h3>Data Sharing and Third Parties</h3>
+    <p>Vestlytics operates independently as an educational decision-support tool. Because direct execution of market trades falls explicitly out of our project scope, we do not link your account to, nor do we share your personal financial data with, third-party live brokers or trading platforms.</p>
+  </>
+);
 
 const RegisterPage = () => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState('tos');
   const navigate = useNavigate();
+  const { updateFinancialData } = useContext(UserFinancialContext);
 
   const getPasswordStrength = (pass) => {
     let score = 0;
@@ -19,14 +58,37 @@ const RegisterPage = () => {
     return score;
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (getPasswordStrength(password) < 3) {
       setError('Password must meet at least 3 criteria (Strong) to create an account.');
       return;
     }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setError('');
-    navigate('/dashboard');
+    setIsLoading(true);
+    try {
+      await api.register(email, password);
+      // Automatically log them in after registration
+      await api.login(email, password);
+      // Initialize Context
+      updateFinancialData({
+        monthlyIncome: '',
+        monthlyExpenses: '',
+        emergencyFund: '',
+        totalDebt: '',
+        monthlyDebtPayment: '',
+        isProfileCompleted: false,
+      });
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Registration failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const strengthScore = getPasswordStrength(password);
@@ -42,7 +104,7 @@ const RegisterPage = () => {
   const strengthInfo = getStrengthDisplay();
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 font-sans animate-fade-in">
+    <div className="h-screen flex bg-slate-50 font-sans overflow-hidden animate-fade-in">
       {/* Left Pane - Branding & Steps */}
       <div className="hidden md:flex flex-col w-1/2 bg-[#0d1117] relative overflow-hidden text-white p-12 lg:p-20 justify-center animate-blur-in">
         {/* Abstract Background Shapes */}
@@ -87,7 +149,7 @@ const RegisterPage = () => {
               </div>
               <div>
                 <h3 className="font-bold text-white">Create your account</h3>
-                <p className="text-slate-500 text-sm">Basic info — name, email, password</p>
+                <p className="text-slate-500 text-sm">Basic info - name, email, password</p>
               </div>
             </div>
 
@@ -116,7 +178,7 @@ const RegisterPage = () => {
       </div>
 
       {/* Right Pane - Form */}
-      <div className="flex-1 flex flex-col relative w-full md:w-1/2">
+      <div className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50">
         {/* Top Navbar */}
         <div className="w-full p-6 flex justify-end items-center gap-6 text-sm font-medium text-slate-600">
           <Link to="/" className="hover:text-slate-900 transition-colors">Features</Link>
@@ -128,7 +190,6 @@ const RegisterPage = () => {
 
         <div className="flex-1 flex items-center justify-center p-6 sm:px-12 py-4">
           <div className="w-full max-w-lg bg-white rounded-2xl p-8 sm:p-10 shadow-[0_0_40px_rgba(0,0,0,0.05)] animate-scale-pop">
-            <h3 className="text-cyan-500 text-xs font-bold tracking-widest uppercase mb-2">Step 1 of 3</h3>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Create your account</h2>
             <p className="text-slate-500 text-sm mb-8">
               Already have an account? <Link to="/login" className="text-cyan-500 font-semibold hover:text-cyan-600">Sign in here</Link>
@@ -141,6 +202,8 @@ const RegisterPage = () => {
                   <input
                     type="text"
                     placeholder="Budi"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-colors placeholder:text-slate-400"
                     required
                   />
@@ -150,6 +213,8 @@ const RegisterPage = () => {
                   <input
                     type="text"
                     placeholder="Santoso"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-colors placeholder:text-slate-400"
                     required
                   />
@@ -161,6 +226,8 @@ const RegisterPage = () => {
                 <input
                   type="email"
                   placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-colors placeholder:text-slate-400"
                   required
                 />
@@ -171,6 +238,8 @@ const RegisterPage = () => {
                 <input
                   type="tel"
                   placeholder="+62 812 xxxx xxxx"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-colors placeholder:text-slate-400"
                   required
                 />
@@ -221,6 +290,8 @@ const RegisterPage = () => {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Re-enter your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-colors placeholder:text-slate-400 pr-10"
                     required
                   />
@@ -237,29 +308,26 @@ const RegisterPage = () => {
               <div className="flex items-start gap-2 pt-1">
                 <input type="checkbox" required className="mt-1 w-4 h-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500" />
                 <span className="text-sm text-slate-600">
-                  I agree to Vestlytics <Link to="#" className="text-cyan-500 hover:text-cyan-600">Terms of Service</Link> and <Link to="#" className="text-cyan-500 hover:text-cyan-600">Privacy Policy</Link>
+                  I agree to Vestlytics <button type="button" onClick={() => { setModalType('tos'); setIsModalOpen(true); }} className="text-cyan-500 hover:text-cyan-600 font-semibold focus:outline-none">Terms of Service</button> and <button type="button" onClick={() => { setModalType('privacy'); setIsModalOpen(true); }} className="text-cyan-500 hover:text-cyan-600 font-semibold focus:outline-none">Privacy Policy</button>
                 </span>
               </div>
 
-              <button type="submit" className="w-full bg-[#0ea5e9] hover:bg-sky-500 text-white font-medium py-2.5 rounded-lg transition-colors mt-2">
-                Create account & continue
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full bg-[#0ea5e9] hover:bg-sky-500 text-white font-medium py-2.5 rounded-lg transition-colors mt-2 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Creating account...
+                  </>
+                ) : (
+                  'Create account & continue'
+                )}
               </button>
 
-              <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs">or sign up with</span>
-                <div className="flex-grow border-t border-slate-200"></div>
-              </div>
 
-              <button type="button" className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium py-2.5 rounded-lg transition-colors">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M22.56 12.25C22.56 11.47 22.49 10.72 22.36 10H12V14.26H17.92C17.66 15.63 16.88 16.79 15.71 17.57V20.34H19.28C21.36 18.42 22.56 15.6 22.56 12.25Z" fill="#4285F4" />
-                  <path d="M12 23C14.97 23 17.46 22.02 19.28 20.34L15.71 17.57C14.72 18.23 13.47 18.63 12 18.63C9.15 18.63 6.74 16.71 5.88 14.13H2.21V16.98C4.01 20.55 7.69 23 12 23Z" fill="#34A853" />
-                  <path d="M5.88 14.13C5.66 13.47 5.54 12.76 5.54 12C5.54 11.24 5.66 10.53 5.88 9.87V7.02H2.21C1.47 8.5 1.05 10.19 1.05 12C1.05 13.81 1.47 15.5 2.21 16.98L5.88 14.13Z" fill="#FBBC05" />
-                  <path d="M12 5.38C13.62 5.38 15.06 5.93 16.2 7.02L19.35 3.87C17.45 2.09 14.97 1 12 1C7.69 1 4.01 3.45 2.21 7.02L5.88 9.87C6.74 7.29 9.15 5.38 12 5.38Z" fill="#EA4335" />
-                </svg>
-                Sign up with Google
-              </button>
             </form>
           </div>
         </div>
@@ -270,6 +338,14 @@ const RegisterPage = () => {
           <span className="font-bold tracking-widest text-slate-800">VEST<span className="font-light">LYTICS</span></span>
         </div>
       </div>
+
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={modalType === 'tos' ? "Terms of Service" : "Privacy Policy"}
+      >
+        {modalType === 'tos' ? <TermsOfServiceContent /> : <PrivacyPolicyContent />}
+      </Modal>
     </div>
   );
 };

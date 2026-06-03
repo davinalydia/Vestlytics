@@ -8,3 +8,74 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+/* Premium Buttons CSS */
+.btn-primary-premium, .btn-secondary-premium, .btn-nav-premium {
+  transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.btn-primary-premium:hover {
+  transform: scale(1.05);
+  background-color: #4f46e5;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4), 0 8px 10px -6px rgba(99, 102, 241, 0.1);
+}
+
+.btn-secondary-premium:hover {
+  transform: scale(1.05);
+  background-color: rgba(30, 41, 59, 0.5);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.4);
+}
+
+.btn-nav-premium:hover {
+  transform: scale(1.05);
+  background-color: #4f46e5;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+}
+
+/* Nav Links Underline Animation */
+.nav-link-animated {
+  position: relative;
+  transition: color 0.3s ease-in-out;
+}
+
+.nav-link-animated::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: -4px;
+  left: 0;
+  background-color: #ffffff;
+  transition: width 0.3s ease-in-out;
+}
+
+.nav-link-animated:hover::after {
+  width: 100%;
+}
+
+.nav-link-animated:hover {
+  color: #ffffff;
+}
+
+/* Page fade-in keyframe (fallback for non-Framer pages) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
