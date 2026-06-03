@@ -1,17 +1,29 @@
+import axios from 'axios';
+import { supabase } from '../../config/supabase.js';
+
 const API_URL = 'http://localhost:5000/api';
 
-const getHeaders = () => {
-  const token = localStorage.getItem('vestlytics_token');
-  const headers = {
+// Membuat instance Axios untuk konfigurasi default secara global
+const apiClient = axios.create({
+  baseURL: API_URL,
+  headers: {
     'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
+  },
+});
 
-// Fallback Mock Data
+// Interceptor untuk menyisipkan token autentikasi secara otomatis pada setiap permintaan (request)
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('vestlytics_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// Data tiruan (mock) telah dikosongkan agar pengguna baru tidak melihat data default
 const MOCK_DATA = {
   profile: {
     monthly_income: 0,
@@ -21,341 +33,448 @@ const MOCK_DATA = {
     monthly_debt_payment: 0,
     net_worth: 0,
   },
-  assets: [
-    { asset_category: 'Stocks', value: 55000000, return_ytd: 12.5, performance: 'Outperform', last_updated: '2026-05-10T00:00:00.000Z' },
-    { asset_category: 'Gold', value: 30000000, return_ytd: 8.1, performance: 'Outperform', last_updated: '2026-05-10T00:00:00.000Z' },
-    { asset_category: 'Bonds', value: 29000000, return_ytd: 3.2, performance: 'In Line', last_updated: '2026-05-10T00:00:00.000Z' },
-    { asset_category: 'Cash / Deposit', value: 24000000, return_ytd: 0.8, performance: 'Underperform', last_updated: '2026-05-10T00:00:00.000Z' },
-  ],
-  cashflow: [
-    { month_period: 'May 2026', income: 12500000, expenses: 7800000, net_savings: 4700000, savings_rate: 37.6 },
-    { month_period: 'Apr 2026', income: 12500000, expenses: 8400000, net_savings: 4100000, savings_rate: 32.8 },
-    { month_period: 'Mar 2026', income: 11000000, expenses: 8200000, net_savings: 2800000, savings_rate: 25.4 },
-    { month_period: 'Feb 2026', income: 11000000, expenses: 9100000, net_savings: 1900000, savings_rate: 17.2 },
-    { month_period: 'Jan 2026', income: 11000000, expenses: 9800000, net_savings: 1200000, savings_rate: 10.9 },
-  ],
-  market: {
-    ticker: 'BBCA',
-    current_price: 10250,
-    chart_historical: [
-      { date: '2026-05-10', price: 9800 },
-      { date: '2026-05-12', price: 9900 },
-      { date: '2026-05-14', price: 10100 },
-      { date: '2026-05-16', price: 10050 },
-      { date: '2026-05-18', price: 10200 },
-      { date: '2026-05-20', price: 10150 },
-      { date: '2026-05-22', price: 10300 },
-      { date: '2026-05-24', price: 10250 },
-    ],
-    prediction_breakdown: {
-      short_term_1d: { price: 10352, change_pct: 0.74 },
-      short_term_7d: { price: 10499, change_pct: 2.43 },
-      long_term_1m: { price: 10738, change_pct: 4.76 },
-      long_term_6m: { price: 9870, change_pct: -3.7 },
-    },
-    ai_insight: {
-      text: 'BBCA is showing short-term bullish momentum based on recent trading volume. Watch for key support levels.',
-      tags: ['Bullish ST', 'Hold / Accumulation'],
-    }
-  },
+  assets: [], // Dikosongkan untuk pengguna baru
+  cashflow: [], // Dikosongkan untuk pengguna baru
+  targets: [], // Dikosongkan untuk pengguna baru
   availableStocks: [
-    { ticker: 'BBCA', price: 10250, change_pct: 1.2 },
-    { ticker: 'BBRI', price: 4800, change_pct: -0.5 },
-    { ticker: 'TLKM', price: 3450, change_pct: 2.1 },
-    { ticker: 'ASII', price: 5125, change_pct: 0.0 },
-    { ticker: 'GOTO', price: 62, change_pct: -3.1 }
+    { ticker: 'BBCA', name: 'Bank Central Asia', sector: 'Finance' },
+    { ticker: 'BBRI', name: 'Bank Rakyat Indonesia', sector: 'Finance' },
+    { ticker: 'TLKM', name: 'Telkom Indonesia', sector: 'Technology' },
+    { ticker: 'ASII', name: 'Astra International', sector: 'Consumer' },
+    { ticker: 'GOTO', name: 'GoTo Gojek Tokopedia', sector: 'Technology' },
   ],
   insights: [
     {
-      id: 1,
-      type: 'PORTFOLIO OVERVIEW',
-      title: 'Portfolio value increased 8.42% - solid performance',
-      description: 'Current value: Rp 8.426.120, with an equivalent invested value. Portfolio score: 7.8/10, with a "Good" risk match. This month\'s performance is above the average for the Indonesian stock market benchmark.',
-      tags: ['Score 7.8/10', '+8.42% MoM'],
-      timestamp: 'Today, 08:00',
+      id: 'ins-1',
+      category: 'Risk Warning',
+      title: 'Konsentrasi Portofolio',
+      description:
+        'Sebagian besar aset Anda berada di sektor saham. Pertimbangkan diversifikasi untuk meminimalisir volatilitas.',
+      impact: 'High',
+      action_link: '/strategy-lab',
+      action_text: 'Simulasikan Diversifikasi',
     },
-    {
-      id: 2,
-      type: 'RISK SIGNAL',
-      title: 'High volatility detected in Stocks segment',
-      description: 'Stocks (14.2% of portfolio) showing negative 24h and 7d trends. HOLD signal issued. Recommended not to add positions until the trend improves. Consider a partial shift to the Money Market.',
-      tags: ['HOLD - Stocks', 'High Volatility'],
-      timestamp: 'Today, 08:05',
-    },
-    {
-      id: 3,
-      type: 'BUY SIGNAL',
-      title: 'Assets 2, 4, and 6 are worth accumulating - BUY signal active',
-      description: 'All three assets have shown a consistent increase of +5.4% over the past 7 days. Momentum is positive and trading volume is on the rise. The AI recommends gradual accumulation with an allocation of 14-30% based on your risk profile.',
-      tags: ['BUY - Asset 2', 'BUY - Asset 4', 'BUY - Asset 6'],
-      timestamp: 'Today, 08:12',
-    },
-  ]
+  ],
 };
 
-// Main API Client Wrapper
 export const api = {
-  // Authentication
-  async login(email, password, rememberMe) {
+  // ==========================================
+  // AUTENTIKASI & PENGGUNA
+  // ==========================================
+
+  // Fungsi untuk memproses masuk (login) pengguna
+  async login(email, password) {
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe }),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      if (!res.ok) throw new Error('Authentication failed');
-      const data = await res.json();
-      localStorage.setItem('vestlytics_token', data.token);
-      return data;
+      if (error) throw error;
+      localStorage.setItem('vestlytics_token', data.session.access_token);
+
+      const fullName = data.user?.user_metadata?.full_name || 'Guest';
+      const mockProfile = {
+        id: data.user.id,
+        email: data.user.email,
+        full_name: fullName,
+        username: fullName.split(' ')[0],
+        phone_number: '',
+        avatar_url: '',
+      };
+      localStorage.setItem('vestlytics_user_me', JSON.stringify(mockProfile));
+
+      return { success: true, message: 'Berhasil masuk', user: data.user };
     } catch (err) {
-      console.warn('Login API failed, logging in locally with mock token:', err.message);
-      // Fallback
-      localStorage.setItem('vestlytics_token', 'mock-jwt-token-value');
-      return { success: true, message: 'Logged in locally', user: { email } };
-    }
-  },
-  async register(email, password) {
-    try {
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) throw new Error('Registration failed');
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.warn('Register API failed, registering locally:', err.message);
-      return { success: true, message: 'Registered locally' };
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Terjadi kesalahan saat login:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
     }
   },
 
+  // Fungsi untuk mendaftarkan pengguna baru beserta nama lengkap
+  async register(email, password, fullName) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } },
+      });
+      if (error) throw error;
+
+      const mockProfile = {
+        id: data.user.id,
+        email,
+        full_name: fullName,
+        username: fullName.split(' ')[0],
+        phone_number: '',
+        avatar_url: '',
+      };
+      localStorage.setItem('vestlytics_user_me', JSON.stringify(mockProfile));
+
+      return { success: true, message: 'Berhasil mendaftar', user: data.user };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Terjadi kesalahan saat mendaftar:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk memproses keluar (logout) dan membersihkan data sesi lokal
+  async logout() {
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem('vestlytics_token');
+      localStorage.removeItem('vestlytics_user_me');
+      localStorage.removeItem('vestlytics_profile'); // Menghapus cache profil finansial
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal memproses logout:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk mengambil data identitas pengguna saat ini
   async getMe() {
     try {
-      const res = await fetch(`${API_URL}/auth/me`, { headers: getHeaders() });
-      if (!res.ok) throw new Error('Failed to load profile');
-      return await res.json();
+      const res = await apiClient.get('/auth/me');
+      const localProfile = JSON.parse(
+        localStorage.getItem('vestlytics_user_me') || '{}',
+      );
+      if (
+        res.data &&
+        res.data.user &&
+        !res.data.user.full_name &&
+        localProfile.full_name
+      ) {
+        res.data.user.full_name = localProfile.full_name;
+      }
+      return res.data;
     } catch (err) {
-      console.warn('getMe API failed, using local storage fallback:', err.message);
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('API getMe gagal, menggunakan data lokal:', errorMessage);
+
       const localProfile = localStorage.getItem('vestlytics_user_me');
       if (localProfile) {
-        return { success: true, user: JSON.parse(localProfile) };
+        return {
+          success: true,
+          isFallback: true,
+          error: errorMessage,
+          cause: err,
+          user: JSON.parse(localProfile),
+        };
       }
       return {
         success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
         user: {
-          id: 'mock-user-id',
-          email: 'crazykiller@email.com',
-          full_name: 'Crazy Killer',
-          username: 'crazykiller',
-          phone_number: '+62 812 3456 7890',
-          avatar_url: ''
-        }
+          id: 'mock-1',
+          email: 'guest@email.com',
+          full_name: 'Guest',
+          username: 'guest',
+          phone_number: '',
+          avatar_url: '',
+        },
       };
     }
   },
 
+  // Fungsi untuk memperbarui informasi profil pengguna
   async updateProfile(payload) {
     try {
-      const res = await fetch(`${API_URL}/auth/update-profile`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to update profile');
-      }
-      const data = await res.json();
-      localStorage.setItem('vestlytics_user_me', JSON.stringify(data.user));
-      return data;
+      const res = await apiClient.put('/auth/update-profile', payload);
+      localStorage.setItem('vestlytics_user_me', JSON.stringify(res.data.user));
+      return res.data;
     } catch (err) {
-      console.warn('updateProfile API failed, using simulated success:', err.message);
-      const localProfile = localStorage.getItem('vestlytics_user_me');
-      const currentUser = localProfile ? JSON.parse(localProfile) : {
-        id: 'mock-user-id',
-        email: 'crazykiller@email.com',
-        full_name: 'Crazy Killer',
-        username: 'crazykiller',
-        phone_number: '+62 812 3456 7890',
-        avatar_url: ''
-      };
-      const updatedUser = {
-        ...currentUser,
-        full_name: payload.full_name !== undefined ? payload.full_name : currentUser.full_name,
-        username: payload.username !== undefined ? payload.username : currentUser.username,
-        phone_number: payload.phone_number !== undefined ? payload.phone_number : currentUser.phone_number,
-        avatar_url: payload.avatar_url !== undefined ? payload.avatar_url : currentUser.avatar_url,
-      };
-      localStorage.setItem('vestlytics_user_me', JSON.stringify(updatedUser));
-      return { success: true, message: 'Profile updated locally', user: updatedUser };
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal memperbarui profil pengguna:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
     }
   },
 
+  // Fungsi untuk mengubah kata sandi
   async changePassword(oldPassword, newPassword) {
     try {
-      const res = await fetch(`${API_URL}/auth/change-password`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({ oldPassword, newPassword }),
+      const res = await apiClient.put('/auth/change-password', {
+        oldPassword,
+        newPassword,
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to change password');
-      }
-      return await res.json();
+      return res.data;
     } catch (err) {
-      console.warn('changePassword API failed, simulating success:', err.message);
-      if (oldPassword === 'wrong') {
-        throw new Error('Old password is incorrect');
-      }
-      return { success: true, message: 'Password updated locally' };
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal mengubah kata sandi:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
     }
   },
 
-  // Profile & Financials
+  // ==========================================
+  // PROFIL KEUANGAN & ARUS KAS
+  // ==========================================
+
+  // Fungsi untuk mengambil profil keuangan
   async getProfile() {
     try {
-      const res = await fetch(`${API_URL}/portfolio/profile`, { headers: getHeaders() });
-      if (!res.ok) throw new Error('Failed to load profile');
-      const data = await res.json();
-      return data;
+      const res = await apiClient.get('/portfolio/profile');
+      return res.data;
     } catch (err) {
-      console.warn('Failed to fetch profile, using mock:', err.message);
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('Gagal memuat profil keuangan:', errorMessage);
       return {
         success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
         profile_data: MOCK_DATA.profile,
-        metrics: {
-          net_savings_rate: '37.8',
-          health_score: 72,
-          health_status: 'Good - room to improve',
-        }
+        metrics: { health_score: 72 },
       };
     }
   },
 
+  // Fungsi untuk menyimpan (POST) profil keuangan
   async saveProfile(payload) {
     try {
-      const res = await fetch(`${API_URL}/portfolio/profile`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to save profile');
-      return await res.json();
+      const res = await apiClient.post('/portfolio/profile', payload);
+      return res.data;
     } catch (err) {
-      console.warn('Failed to save profile on server, simulated success:', err.message);
-      return { success: true, message: 'Profile saved locally' };
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal menyimpan profil keuangan:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
     }
   },
 
-  // Assets
-  async getAssets() {
-    try {
-      const res = await fetch(`${API_URL}/portfolio/assets`, { headers: getHeaders() });
-      if (!res.ok) throw new Error('Failed to load assets');
-      return await res.json();
-    } catch (err) {
-      console.warn('Failed to fetch assets, using mock:', err.message);
-      return {
-        success: true,
-        assets: MOCK_DATA.assets,
-        risk_metrics: {
-          overall_risk: 'Medium',
-          volatility_index: 0.38,
-          sharpe_ratio: 1.14,
-          max_drawdown: -6.2,
-          beta: 0.82,
-        }
-      };
-    }
-  },
-
-  async saveAsset(payload) {
-    try {
-      const res = await fetch(`${API_URL}/portfolio/assets`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to save asset');
-      return await res.json();
-    } catch (err) {
-      console.warn('Failed to save asset, simulating success:', err.message);
-      return { success: true, message: 'Asset added locally', asset: [payload] };
-    }
-  },
-
-  // Cashflow history
+  // Fungsi untuk mengambil riwayat arus kas bulanan
   async getCashflow() {
     try {
-      const res = await fetch(`${API_URL}/portfolio/cashflow`, { headers: getHeaders() });
-      if (!res.ok) throw new Error('Failed to load cashflow history');
-      return await res.json();
+      const res = await apiClient.get('/portfolio/cashflow');
+      return res.data;
     } catch (err) {
-      console.warn('Failed to fetch cashflow, using mock:', err.message);
-      return { success: true, history: MOCK_DATA.cashflow };
-    }
-  },
-
-  // Market
-  async getAvailableStocks() {
-    try {
-      const res = await fetch(`${API_URL}/market/available-stocks`);
-      if (!res.ok) throw new Error('Failed to load stock list');
-      return await res.json();
-    } catch (err) {
-      console.warn('Failed to fetch stock list, using mock:', err.message);
-      return { success: true, stocks: MOCK_DATA.availableStocks };
-    }
-  },
-
-  async getMarketAnalysis(ticker) {
-    try {
-      const res = await fetch(`${API_URL}/market/analysis/${ticker}`);
-      if (!res.ok) throw new Error('Failed to load analysis');
-      return await res.json();
-    } catch (err) {
-      console.warn(`Failed to fetch analysis for ${ticker}, using mock:`, err.message);
-      // Simulate prices for other tickers
-      const factor = ticker === 'BBCA' ? 1.0 : ticker === 'BBRI' ? 0.45 : ticker === 'TLKM' ? 0.33 : ticker === 'ASII' ? 0.5 : 0.1;
-      const basePrice = 10000 * factor;
-      const chart_historical = MOCK_DATA.market.chart_historical.map((d, index) => ({
-        date: d.date,
-        price: Math.round(basePrice * (1 + (index * 0.015) - (Math.random() * 0.02)))
-      }));
-      const currentPrice = chart_historical[chart_historical.length - 1].price;
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('Gagal memuat riwayat arus kas:', errorMessage);
       return {
         success: true,
-        data: {
-          ticker,
-          current_price: currentPrice,
-          chart_historical,
-          prediction_breakdown: {
-            short_term_1d: { price: Math.round(currentPrice * 1.01), change_pct: 0.74 },
-            short_term_7d: { price: Math.round(currentPrice * 1.02), change_pct: 2.43 },
-            long_term_1m: { price: Math.round(currentPrice * 1.04), change_pct: 4.76 },
-            long_term_6m: { price: Math.round(currentPrice * 0.96), change_pct: -3.7 },
-          },
-          ai_insight: {
-            text: `${ticker} is showing short-term momentum based on recent trading activity. AI model suggests observing price points close to support.`,
-            tags: ['Model Suggestion', 'Hold / Accumulation'],
-          }
-        }
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
+        history: [],
       };
     }
   },
 
-  // AI Consultant
+  // Fungsi untuk menghapus 1 baris riwayat arus kas secara spesifik (DELETE)
+  async deleteCashflow(id) {
+    try {
+      const res = await apiClient.delete(`/portfolio/cashflow/${id}`);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error(`Gagal menghapus arus kas dengan ID ${id}:`, errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk mereset atau menghapus seluruh riwayat arus kas pengguna (DELETE)
+  async resetCashflow() {
+    try {
+      const res = await apiClient.delete('/portfolio/cashflow/reset/all');
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal mereset riwayat arus kas:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // ==========================================
+  // MANAJEMEN ASET (CRUD)
+  // ==========================================
+
+  // Fungsi untuk mengambil daftar aset
+  async getAssets() {
+    try {
+      const res = await apiClient.get('/portfolio/assets');
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('Gagal memuat daftar aset:', errorMessage);
+      return {
+        success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
+        assets: MOCK_DATA.assets,
+      };
+    }
+  },
+
+  // Fungsi untuk menambahkan (POST) aset baru
+  async saveAsset(payload) {
+    try {
+      const res = await apiClient.post('/portfolio/assets', payload);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal menyimpan data aset:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk memperbarui (PUT) aset yang sudah ada
+  async updateAsset(id, payload) {
+    try {
+      const res = await apiClient.put(`/portfolio/assets/${id}`, payload);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error(`Gagal memperbarui aset dengan ID ${id}:`, errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk menghapus (DELETE) aset
+  async deleteAsset(id) {
+    try {
+      const res = await apiClient.delete(`/portfolio/assets/${id}`);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error(`Gagal menghapus aset dengan ID ${id}:`, errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // ==========================================
+  // TARGET KEUANGAN (CRUD)
+  // ==========================================
+
+  // Fungsi untuk mengambil seluruh daftar target keuangan
+  async getTargets() {
+    try {
+      const res = await apiClient.get('/portfolio/targets');
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('Gagal memuat daftar target keuangan:', errorMessage);
+      return {
+        success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
+        targets: MOCK_DATA.targets,
+      };
+    }
+  },
+
+  // Fungsi untuk menambahkan (POST) target keuangan baru
+  async saveTarget(payload) {
+    try {
+      const res = await apiClient.post('/portfolio/targets', payload);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Gagal menyimpan target baru:', errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk memperbarui (PUT) progress atau data target
+  async updateTarget(id, payload) {
+    try {
+      const res = await apiClient.put(`/portfolio/targets/${id}`, payload);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error(`Gagal memperbarui target dengan ID ${id}:`, errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // Fungsi untuk menghapus (DELETE) target keuangan
+  async deleteTarget(id) {
+    try {
+      const res = await apiClient.delete(`/portfolio/targets/${id}`);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error(`Gagal menghapus target dengan ID ${id}:`, errorMessage);
+      throw new Error(errorMessage, { cause: err });
+    }
+  },
+
+  // ==========================================
+  // PASAR & KONSULTAN AI
+  // ==========================================
+
+  // Fungsi untuk mengambil daftar saham yang tersedia
+  async getAvailableStocks() {
+    try {
+      const res = await apiClient.get('/market/available-stocks');
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('Gagal memuat daftar saham:', errorMessage);
+      return {
+        success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
+        stocks: MOCK_DATA.availableStocks,
+      };
+    }
+  },
+
+  // Fungsi untuk mendapatkan analisis pasar untuk satu aset/saham spesifik
+  async getMarketAnalysis(ticker) {
+    try {
+      const res = await apiClient.get(`/market/analysis/${ticker}`);
+      return res.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn(
+        `Gagal memuat analisis pasar untuk ${ticker}:`,
+        errorMessage,
+      );
+
+      return {
+        success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
+        data: {
+          ticker,
+          current_price: 10000,
+          prediction_breakdown: {
+            short_term_1d: { price: 10100, change_pct: 1.0 },
+            short_term_7d: { price: 10200, change_pct: 2.0 },
+            long_term_1m: { price: 10500, change_pct: 5.0 },
+            long_term_6m: { price: 9500, change_pct: -5.0 },
+          },
+          ai_insight: {
+            text: 'Simulasi analisis lokal karena server tidak merespons.',
+            tags: ['Simulasi'],
+          },
+        },
+      };
+    }
+  },
+
+  // Fungsi untuk mengambil wawasan AI dari Konsultan Portofolio
   async getInsights() {
     try {
-      const res = await fetch(`${API_URL}/consultant/insights`, { headers: getHeaders() });
-      if (!res.ok) throw new Error('Failed to load insights');
-      return await res.json();
+      const res = await apiClient.get('/consultant/insights');
+      return res.data;
     } catch (err) {
-      console.warn('Failed to fetch insights, using mock:', err.message);
-      return { success: true, data: MOCK_DATA.insights };
+      const errorMessage = err.response?.data?.error || err.message;
+      console.warn('Gagal memuat wawasan AI:', errorMessage);
+      return {
+        success: true,
+        isFallback: true,
+        error: errorMessage,
+        cause: err,
+        data: MOCK_DATA.insights,
+      };
     }
-  }
+  },
 };
+
 export default api;

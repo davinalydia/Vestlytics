@@ -4,25 +4,32 @@ import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Endpoint untuk ambil profil keuangan & hitung skor kesehatan
+// =======================================================================
+// ENDPOINT PROFIL KEUANGAN & ARUS KAS (CASHFLOW)
+// =======================================================================
+
+// Endpoint untuk mengambil profil keuangan & menghitung skor kesehatan finansial
 router.get('/profile', requireAuth, async (req, res) => {
   const userId = req.user.id;
+
   const { data, error } = await supabase
     .from('financial_profiles')
     .select('*')
     .eq('user_id', userId)
     .single();
 
-  if (error && error.code !== 'PGRST116')
+  if (error && error.code !== 'PGRST116') {
     return res
       .status(500)
       .json({ error: 'Gagal memuat profil keuangan pengguna.' });
+  }
 
   const profile = data || {
     monthly_income: 0,
     monthly_expenses: 0,
     total_debt: 0,
   };
+
   const netSavings = profile.monthly_income - profile.monthly_expenses;
   const savingsRate =
     profile.monthly_income > 0
@@ -40,10 +47,12 @@ router.get('/profile', requireAuth, async (req, res) => {
   });
 });
 
-// Endpoint untuk simpan profil keuangan & catat riwayat arus kas
+// Endpoint untuk menyimpan profil keuangan & mencatat riwayat arus kas
 router.post('/profile', requireAuth, async (req, res) => {
   const userId = req.user.id;
+
   const {
+    month_period, // Menangkap parameter periode bulan (format: YYYY-MM) dari klien (frontend)
     monthly_income,
     monthly_expenses,
     emergency_fund,
@@ -51,7 +60,7 @@ router.post('/profile', requireAuth, async (req, res) => {
     monthly_debt_payment,
   } = req.body;
 
-  // 1. Update atau insert data profil utama ke tabel financial_profiles
+  // 1. Memperbarui (update) atau memasukkan (insert) data profil utama ke tabel financial_profiles
   const { error: profileError } = await supabase
     .from('financial_profiles')
     .upsert({
@@ -70,12 +79,12 @@ router.post('/profile', requireAuth, async (req, res) => {
       .json({ error: 'Gagal memperbarui profil keuangan.' });
   }
 
-  // 2. Hitung metrik tabungan (savings rate)
+  // 2. Menghitung metrik rasio tabungan (savings rate)
   const netSavings = monthly_income - monthly_expenses;
   const savingsRate =
     monthly_income > 0 ? (netSavings / monthly_income) * 100 : 0;
 
-  // 3. Set format bulan saat ini (Contoh: 'May 2026')
+  // 3. Mengonversi format bulan dari input pengguna (Date Picker) ke format baca sistem
   const date = new Date();
   const monthNames = [
     'Jan',
@@ -91,15 +100,27 @@ router.post('/profile', requireAuth, async (req, res) => {
     'Nov',
     'Dec',
   ];
-  const currentMonth = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
 
-  // 4. Simpan riwayat arus kas bulanan ke tabel monthly_cashflow
+  // Nilai default menggunakan bulan berjalan dari sistem server jika input kosong
+  let finalMonthPeriod = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+
+  // Jika frontend mengirimkan data month_period (format: 'YYYY-MM'), parsing nilainya menjadi 'Bulan Tahun'
+  if (month_period) {
+    const [year, month] = month_period.split('-');
+    if (year && month) {
+      finalMonthPeriod = `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+    } else {
+      finalMonthPeriod = month_period;
+    }
+  }
+
+  // 4. Menyimpan riwayat arus kas bulanan ke tabel monthly_cashflow
   const { error: historyError } = await supabase
     .from('monthly_cashflow')
     .insert([
       {
         user_id: userId,
-        month_period: currentMonth,
+        month_period: finalMonthPeriod,
         income: monthly_income,
         expenses: monthly_expenses,
         net_savings: netSavings,
@@ -119,15 +140,84 @@ router.post('/profile', requireAuth, async (req, res) => {
   });
 });
 
-// Endpoint untuk ambil data portofolio aset & metrik risiko
+// Endpoint untuk mengambil riwayat arus kas beserta ID-nya untuk keperluan tabel
+router.get('/cashflow', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error } = await supabase
+    .from('monthly_cashflow')
+    .select('id, month_period, income, expenses, net_savings, savings_rate')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: 'Gagal memuat riwayat arus kas.' });
+  }
+
+  res.json({ success: true, history: data });
+});
+
+// Endpoint untuk menghapus seluruh (RESET) riwayat arus kas pengguna
+// Catatan: Route ini diletakkan di atas /:id agar parameter 'reset/all' tidak ditangkap sebagai ID
+router.delete('/cashflow/reset/all', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const { error } = await supabase
+    .from('monthly_cashflow')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    return res
+      .status(500)
+      .json({
+        error: 'Gagal mereset riwayat tabel arus kas.',
+        details: error.message,
+      });
+  }
+
+  res.json({
+    success: true,
+    message: 'Seluruh riwayat arus kas berhasil direset.',
+  });
+});
+
+// Endpoint untuk menghapus (DELETE) satu baris riwayat arus kas spesifik berdasarkan ID
+router.delete('/cashflow/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const cashflowId = req.params.id;
+
+  const { error } = await supabase
+    .from('monthly_cashflow')
+    .delete()
+    .eq('id', cashflowId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return res
+      .status(500)
+      .json({
+        error: 'Gagal menghapus baris riwayat arus kas.',
+        details: error.message,
+      });
+  }
+
+  res.json({ success: true, message: 'Baris riwayat berhasil dihapus.' });
+});
+
+// =======================================================================
+// ENDPOINT MANAJEMEN ASET
+// =======================================================================
+
+// Endpoint untuk mengambil data portofolio aset & metrik risiko simulasi
 router.get('/assets', requireAuth, async (req, res) => {
   const userId = req.user.id;
+
   const { data: assets, error } = await supabase
     .from('user_assets')
     .select('*')
     .eq('user_id', userId);
 
-  // Log error dari Supabase untuk keperluan debugging
   if (error) {
     console.error('Error dari Supabase:', error);
     return res
@@ -148,39 +238,17 @@ router.get('/assets', requireAuth, async (req, res) => {
   });
 });
 
-// Endpoint untuk ambil riwayat arus kas buat tabel di frontend
-router.get('/cashflow', requireAuth, async (req, res) => {
-  const userId = req.user.id;
-
-  // Ambil data riwayat bulanan, urutkan dari yang terbaru
-  const { data, error } = await supabase
-    .from('monthly_cashflow')
-    .select('month_period, income, expenses, net_savings, savings_rate')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    return res.status(500).json({ error: 'Gagal memuat riwayat arus kas.' });
-  }
-
-  res.json({ success: true, history: data });
-});
-
-// Endpoint untuk tambah aset baru ke portofolio user
+// Endpoint untuk menambahkan aset baru ke dalam portofolio pengguna
 router.post('/assets', requireAuth, async (req, res) => {
   const userId = req.user.id;
-
-  // Terima payload data dari input user
   const { asset_category, value, return_ytd, performance } = req.body;
 
-  // Validasi basic biar data penting tidak kosong
   if (!asset_category || value === undefined) {
     return res
       .status(400)
       .json({ error: 'Kategori aset dan nilainya wajib diisi.' });
   }
 
-  // Insert data aset baru ke tabel user_assets
   const { data, error } = await supabase
     .from('user_assets')
     .insert([
@@ -229,12 +297,10 @@ router.put('/assets/:id', requireAuth, async (req, res) => {
     .select();
 
   if (error) {
-    return res
-      .status(500)
-      .json({
-        error: 'Gagal memperbarui rincian aset.',
-        details: error.message,
-      });
+    return res.status(500).json({
+      error: 'Gagal memperbarui rincian aset.',
+      details: error.message,
+    });
   }
 
   res.json({
@@ -256,22 +322,23 @@ router.delete('/assets/:id', requireAuth, async (req, res) => {
     .eq('user_id', userId);
 
   if (error) {
-    return res
-      .status(500)
-      .json({
-        error: 'Gagal menghapus aset dari portofolio.',
-        details: error.message,
-      });
+    return res.status(500).json({
+      error: 'Gagal menghapus aset dari portofolio.',
+      details: error.message,
+    });
   }
 
   res.json({ success: true, message: 'Data aset berhasil dihapus.' });
 });
 
+// =======================================================================
 // ENDPOINT FINANCIAL TARGETS
+// =======================================================================
 
 // Mengambil seluruh daftar target keuangan pengguna
 router.get('/targets', requireAuth, async (req, res) => {
   const userId = req.user.id;
+
   const { data, error } = await supabase
     .from('user_targets')
     .select('*')
@@ -279,18 +346,16 @@ router.get('/targets', requireAuth, async (req, res) => {
     .order('created_at', { ascending: true });
 
   if (error) {
-    return res
-      .status(500)
-      .json({
-        error: 'Gagal memuat daftar target keuangan.',
-        details: error.message,
-      });
+    return res.status(500).json({
+      error: 'Gagal memuat daftar target keuangan.',
+      details: error.message,
+    });
   }
 
   res.json({ success: true, targets: data || [] });
 });
 
-// Menambahkan target keuangan baru (Contoh: Dana Darurat, Beli Properti)
+// Menambahkan target keuangan baru (Contoh: Dana Darurat, Tabungan Properti)
 router.post('/targets', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const { target_name, target_amount, current_progress } = req.body;
@@ -319,16 +384,14 @@ router.post('/targets', requireAuth, async (req, res) => {
       .json({ error: 'Gagal menyimpan target baru.', details: error.message });
   }
 
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: 'Data target berhasil ditambahkan.',
-      target: data,
-    });
+  res.status(201).json({
+    success: true,
+    message: 'Data target berhasil ditambahkan.',
+    target: data,
+  });
 });
 
-// Memperbarui data target (Mengubah nama, nominal target, atau progress tabungan)
+// Memperbarui data target (Mengubah nama, nominal target, atau perkembangan tabungan)
 router.put('/targets/:id', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const targetId = req.params.id;
@@ -347,12 +410,10 @@ router.put('/targets/:id', requireAuth, async (req, res) => {
     .select();
 
   if (error) {
-    return res
-      .status(500)
-      .json({
-        error: 'Gagal memperbarui progress target.',
-        details: error.message,
-      });
+    return res.status(500).json({
+      error: 'Gagal memperbarui progress target.',
+      details: error.message,
+    });
   }
 
   res.json({

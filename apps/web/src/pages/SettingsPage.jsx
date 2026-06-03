@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useRef } from 'react';
 import { UserFinancialContext } from '../context/UserFinancialContext';
-import { api } from '../services/api';
+import { api } from '../services/api.js';
 import './settings.css';
 
 const SettingsPage = () => {
@@ -204,7 +204,7 @@ const SettingsPage = () => {
                   )}
                 </div>
                 <div className="profile-info">
-                  <span className="profile-name">{localFullName || 'Crazy Killer'}</span>
+                  <span className="profile-name">{localFullName || 'Guest'}</span>
                   <span className="profile-email">{localEmail || 'crazykiller@email.com'}</span>
                   <button 
                     type="button" 

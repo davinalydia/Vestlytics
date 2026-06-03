@@ -5,6 +5,7 @@ import { api } from '../services/api';
 export const UserFinancialContext = createContext();
 
 export const UserFinancialProvider = ({ children }) => {
+  // Menginisialisasi state dengan nilai kosong murni agar tidak ada data tiruan yang muncul
   const [financialData, setFinancialData] = useState({
     monthlyIncome: '',
     monthlyExpenses: '',
@@ -13,174 +14,238 @@ export const UserFinancialProvider = ({ children }) => {
     monthlyDebtPayment: '',
     netWorth: '',
     isProfileCompleted: false,
-    assets: {
-      stocks: '',
-      gold: '',
-      bonds: '',
-      cash: '',
-    },
-    assetsList: [
-      { asset_category: 'Stocks', value: 55000000, return_ytd: 12.5, performance: 'Outperform', last_updated: new Date().toISOString() },
-      { asset_category: 'Gold', value: 30000000, return_ytd: 8.1, performance: 'Outperform', last_updated: new Date().toISOString() },
-      { asset_category: 'Bonds', value: 29000000, return_ytd: 3.2, performance: 'In Line', last_updated: new Date().toISOString() },
-      { asset_category: 'Cash / Deposit', value: 24000000, return_ytd: 0.8, performance: 'Underperform', last_updated: new Date().toISOString() }
-    ],
-    financialTargets: [
-      { id: 'emergency', name: 'Dana darurat 6 bulan', targetAmount: 0, deadline: '6 months', saved: 0, isDefault: true },
-      { id: 'property', name: 'Beli properti 2028', targetAmount: 150000000, deadline: '2028', saved: 0, isDefault: true },
-      { id: 'fire', name: 'Pensiun dini (FIRE)', targetAmount: 360000000, deadline: 'FIRE', saved: 0, isDefault: true }
-    ]
+    assetsList: [],
+    financialTargets: [],
   });
 
-  const [userProfile, setUserProfile] = useState({
-    fullName: 'Crazy Killer',
-    username: 'crazykiller',
-    email: 'crazykiller@email.com',
-    phoneNumber: '+62 812 3456 7890',
-    avatarUrl: ''
-  });
-
-  const [loadingProfile, setLoadingProfile] = useState(true);
-
-  // Load financial profile from localStorage on mount
-  useEffect(() => {
-    const savedData = localStorage.getItem('vestlytics_profile');
-    if (savedData) {
+  const getInitialProfile = () => {
+    const savedProfile = localStorage.getItem('vestlytics_user_me');
+    if (savedProfile) {
       try {
-        const parsed = JSON.parse(savedData);
-        if (!parsed.assetsList) {
-          parsed.assetsList = [
-            { asset_category: 'Stocks', value: 55000000, return_ytd: 12.5, performance: 'Outperform', last_updated: new Date().toISOString() },
-            { asset_category: 'Gold', value: 30000000, return_ytd: 8.1, performance: 'Outperform', last_updated: new Date().toISOString() },
-            { asset_category: 'Bonds', value: 29000000, return_ytd: 3.2, performance: 'In Line', last_updated: new Date().toISOString() },
-            { asset_category: 'Cash / Deposit', value: 24000000, return_ytd: 0.8, performance: 'Underperform', last_updated: new Date().toISOString() }
-          ];
-        }
-        if (!parsed.financialTargets) {
-          parsed.financialTargets = [
-            { id: 'emergency', name: 'Dana darurat 6 bulan', targetAmount: 0, deadline: '6 months', saved: 0, isDefault: true },
-            { id: 'property', name: 'Beli properti 2028', targetAmount: 150000000, deadline: '2028', saved: 0, isDefault: true },
-            { id: 'fire', name: 'Pensiun dini (FIRE)', targetAmount: 360000000, deadline: 'FIRE', saved: 0, isDefault: true }
-          ];
-        }
-        Promise.resolve().then(() => {
-          setFinancialData(parsed);
-        });
-      } catch (err) {
-        console.error('Failed to parse financial data', err);
+        const parsed = JSON.parse(savedProfile);
+        return {
+          fullName: parsed.full_name || '',
+          username: parsed.username || '',
+          email: parsed.email || '',
+          phoneNumber: parsed.phone_number || '',
+          avatarUrl: parsed.avatar_url || '',
+        };
+      } catch (e) {
+        console.error('Gagal memproses data profil lokal', e);
       }
     }
-  }, []);
+    return {
+      fullName: '',
+      username: '',
+      email: '',
+      phoneNumber: '',
+      avatarUrl: '',
+    };
+  };
 
-  // Fetch auth profile details from /auth/me or localStorage mock fallback on mount
+  const [userProfile, setUserProfile] = useState(getInitialProfile);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  // Memuat data langsung dari backend sebagai Single Source of Truth agar sinkron pasca-refresh
   useEffect(() => {
-    const fetchProfile = async () => {
+    const syncDataFromBackend = async () => {
+      const token = localStorage.getItem('vestlytics_token');
+      if (!token) {
+        setLoadingProfile(false);
+        return;
+      }
+
       try {
-        const res = await api.getMe();
-        if (res && res.success && res.user) {
-          setUserProfile({
-            fullName: res.user.full_name || '',
-            username: res.user.username || '',
-            email: res.user.email || '',
-            phoneNumber: res.user.phone_number || '',
-            avatarUrl: res.user.avatar_url || ''
-          });
+        const [userRes, profileRes, assetsRes, targetsRes] = await Promise.all([
+          api.getMe(),
+          api.getProfile(),
+          api.getAssets(),
+          api.getTargets(),
+        ]);
+
+        // Sinkronisasi profil otentikasi
+        if (userRes && userRes.success && userRes.user) {
+          setUserProfile((prev) => ({
+            ...prev,
+            fullName: userRes.user.full_name || prev.fullName,
+            username: userRes.user.username || prev.username,
+            email: userRes.user.email || prev.email,
+            phoneNumber: userRes.user.phone_number || prev.phoneNumber,
+            avatarUrl: userRes.user.avatar_url || prev.avatarUrl,
+          }));
         }
+
+        // Sinkronisasi data keuangan utama dan mencegah penguncian Onboarding
+        setFinancialData((prev) => {
+          let updated = { ...prev };
+
+          if (profileRes && profileRes.success && profileRes.profile_data) {
+            const p = profileRes.profile_data;
+            const isCompleted = p.monthly_income > 0 && p.monthly_expenses > 0;
+            updated = {
+              ...updated,
+              monthlyIncome: p.monthly_income || '',
+              monthlyExpenses: p.monthly_expenses || '',
+              emergencyFund: p.emergency_fund || '',
+              totalDebt: p.total_debt || '',
+              monthlyDebtPayment: p.monthly_debt_payment || '',
+              isProfileCompleted: isCompleted,
+            };
+          }
+
+          if (assetsRes && assetsRes.success) {
+            updated.assetsList = assetsRes.assets || [];
+          }
+
+          if (targetsRes && targetsRes.success) {
+            updated.financialTargets = targetsRes.targets || [];
+          }
+
+          localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+          return updated;
+        });
       } catch (err) {
-        console.error('Failed to fetch user profile in context:', err);
+        console.error('Gagal menyinkronkan data dari server:', err);
+        // Fallback ke localStorage jika terjadi masalah jaringan
+        const savedData = localStorage.getItem('vestlytics_profile');
+        if (savedData) {
+          try {
+            setFinancialData(JSON.parse(savedData));
+          } catch (e) {
+            console.error('Gagal parsing local profile', e);
+          }
+        }
       } finally {
         setLoadingProfile(false);
       }
     };
 
-    const token = localStorage.getItem('vestlytics_token');
-    if (token) {
-      fetchProfile();
-    } else {
-      setLoadingProfile(false);
-    }
+    syncDataFromBackend();
   }, []);
 
+  // Memperbarui data finansial dengan menggunakan prevState untuk mencegah Race Condition (Stale Data)
   const updateFinancialData = (newData) => {
-    const updated = { ...financialData, ...newData };
-    setFinancialData(updated);
-    localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+    setFinancialData((prev) => {
+      const updated = { ...prev, ...newData };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const addAssetCategory = (newAsset) => {
-    const updatedAssetsList = [
-      ...(financialData.assetsList || []),
-      {
-        ...newAsset,
-        last_updated: new Date().toISOString()
-      }
-    ];
-    updateFinancialData({ assetsList: updatedAssetsList });
+    setFinancialData((prev) => {
+      const updatedAssetsList = [
+        ...(prev.assetsList || []),
+        { ...newAsset, last_updated: new Date().toISOString() },
+      ];
+      const updated = { ...prev, assetsList: updatedAssetsList };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const updateAssetCategory = (categoryName, updatedFields) => {
-    const updatedAssetsList = (financialData.assetsList || []).map((asset) => {
-      if (asset.asset_category === categoryName) {
-        return { ...asset, ...updatedFields, last_updated: new Date().toISOString() };
-      }
-      return asset;
+    setFinancialData((prev) => {
+      const updatedAssetsList = (prev.assetsList || []).map((asset) =>
+        asset.asset_category === categoryName
+          ? {
+              ...asset,
+              ...updatedFields,
+              last_updated: new Date().toISOString(),
+            }
+          : asset,
+      );
+      const updated = { ...prev, assetsList: updatedAssetsList };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
     });
-    updateFinancialData({ assetsList: updatedAssetsList });
   };
 
   const deleteAssetCategory = (categoryName) => {
-    const updatedAssetsList = (financialData.assetsList || []).filter(
-      (asset) => asset.asset_category !== categoryName
-    );
-    updateFinancialData({ assetsList: updatedAssetsList });
+    setFinancialData((prev) => {
+      const updatedAssetsList = (prev.assetsList || []).filter(
+        (asset) => asset.asset_category !== categoryName,
+      );
+      const updated = { ...prev, assetsList: updatedAssetsList };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const addFinancialTarget = (newTarget) => {
-    const updatedTargets = [
-      ...(financialData.financialTargets || []),
-      {
-        id: Math.random().toString(36).substring(2, 9),
-        ...newTarget
-      }
-    ];
-    updateFinancialData({ financialTargets: updatedTargets });
+    setFinancialData((prev) => {
+      const updatedTargets = [
+        ...(prev.financialTargets || []),
+        { id: Math.random().toString(36).substring(2, 9), ...newTarget },
+      ];
+      const updated = { ...prev, financialTargets: updatedTargets };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const updateFinancialTarget = (targetId, updatedFields) => {
-    const updatedTargets = (financialData.financialTargets || []).map((target) => {
-      if (target.id === targetId) {
-        return { ...target, ...updatedFields };
-      }
-      return target;
+    setFinancialData((prev) => {
+      const updatedTargets = (prev.financialTargets || []).map((target) =>
+        target.id === targetId ? { ...target, ...updatedFields } : target,
+      );
+      const updated = { ...prev, financialTargets: updatedTargets };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
     });
-    updateFinancialData({ financialTargets: updatedTargets });
   };
 
   const deleteFinancialTarget = (targetId) => {
-    const updatedTargets = (financialData.financialTargets || []).filter(
-      (target) => target.id !== targetId
-    );
-    updateFinancialData({ financialTargets: updatedTargets });
+    setFinancialData((prev) => {
+      const updatedTargets = (prev.financialTargets || []).filter(
+        (target) => target.id !== targetId,
+      );
+      const updated = { ...prev, financialTargets: updatedTargets };
+      localStorage.setItem('vestlytics_profile', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const updateUserProfile = (newProfile) => {
-    setUserProfile((prev) => ({ ...prev, ...newProfile }));
+    setUserProfile((prev) => {
+      const updated = { ...prev, ...newProfile };
+      try {
+        const localStr = localStorage.getItem('vestlytics_user_me');
+        const localProfile = localStr ? JSON.parse(localStr) : {};
+        Object.assign(localProfile, {
+          full_name: updated.fullName,
+          username: updated.username,
+          email: updated.email,
+          phone_number: updated.phoneNumber,
+          avatar_url: updated.avatarUrl,
+        });
+        localStorage.setItem(
+          'vestlytics_user_me',
+          JSON.stringify(localProfile),
+        );
+      } catch (e) {
+        console.error('Gagal menyinkronkan profil ke penyimpanan lokal', e);
+      }
+      return updated;
+    });
   };
 
   return (
-    <UserFinancialContext.Provider value={{
-      financialData,
-      updateFinancialData,
-      userProfile,
-      updateUserProfile,
-      loadingProfile,
-      addAssetCategory,
-      updateAssetCategory,
-      deleteAssetCategory,
-      addFinancialTarget,
-      updateFinancialTarget,
-      deleteFinancialTarget
-    }}>
+    <UserFinancialContext.Provider
+      value={{
+        financialData,
+        updateFinancialData,
+        userProfile,
+        updateUserProfile,
+        loadingProfile,
+        addAssetCategory,
+        updateAssetCategory,
+        deleteAssetCategory,
+        addFinancialTarget,
+        updateFinancialTarget,
+        deleteFinancialTarget,
+      }}
+    >
       {children}
     </UserFinancialContext.Provider>
   );

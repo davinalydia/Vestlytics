@@ -495,7 +495,7 @@ export const DashboardLayout = () => {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-slate-500"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                   )}
                 </div>
-                <span className="user-name">{userProfile?.fullName || 'Crazy Killer'}</span>
+                <span className="user-name">{userProfile?.fullName || 'Guest'}</span>
                 <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
               </div>
 
