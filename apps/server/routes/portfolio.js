@@ -137,7 +137,7 @@ router.get('/assets', requireAuth, async (req, res) => {
 
   res.json({
     success: true,
-    assets: assets || [], // Berikan fallback array kosong jika data null
+    assets: assets || [],
     risk_metrics: {
       overall_risk: 'Medium',
       volatility_index: 0.38,
@@ -188,8 +188,8 @@ router.post('/assets', requireAuth, async (req, res) => {
         user_id: userId,
         asset_category,
         value,
-        return_ytd: return_ytd || 0, // Nilai default 0 jika belum ada data historis
-        performance: performance || 'In Line', // Status default
+        return_ytd: return_ytd || 0,
+        performance: performance || 'In Line',
         last_updated: new Date().toISOString(),
       },
     ])
@@ -207,6 +207,179 @@ router.post('/assets', requireAuth, async (req, res) => {
     message: 'Kategori aset berhasil ditambahkan ke portofolio.',
     asset: data,
   });
+});
+
+// Endpoint untuk memperbarui (UPDATE) data aset di dalam portofolio
+router.put('/assets/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const assetId = req.params.id;
+  const { asset_category, value, return_ytd, performance } = req.body;
+
+  const { data, error } = await supabase
+    .from('user_assets')
+    .update({
+      asset_category,
+      value,
+      return_ytd,
+      performance,
+      last_updated: new Date().toISOString(),
+    })
+    .eq('id', assetId)
+    .eq('user_id', userId)
+    .select();
+
+  if (error) {
+    return res
+      .status(500)
+      .json({
+        error: 'Gagal memperbarui rincian aset.',
+        details: error.message,
+      });
+  }
+
+  res.json({
+    success: true,
+    message: 'Data aset berhasil diperbarui.',
+    asset: data,
+  });
+});
+
+// Endpoint untuk menghapus (DELETE) data aset dari portofolio
+router.delete('/assets/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const assetId = req.params.id;
+
+  const { error } = await supabase
+    .from('user_assets')
+    .delete()
+    .eq('id', assetId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return res
+      .status(500)
+      .json({
+        error: 'Gagal menghapus aset dari portofolio.',
+        details: error.message,
+      });
+  }
+
+  res.json({ success: true, message: 'Data aset berhasil dihapus.' });
+});
+
+// ENDPOINT FINANCIAL TARGETS
+
+// Mengambil seluruh daftar target keuangan pengguna
+router.get('/targets', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { data, error } = await supabase
+    .from('user_targets')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return res
+      .status(500)
+      .json({
+        error: 'Gagal memuat daftar target keuangan.',
+        details: error.message,
+      });
+  }
+
+  res.json({ success: true, targets: data || [] });
+});
+
+// Menambahkan target keuangan baru (Contoh: Dana Darurat, Beli Properti)
+router.post('/targets', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { target_name, target_amount, current_progress } = req.body;
+
+  if (!target_name || !target_amount) {
+    return res
+      .status(400)
+      .json({ error: 'Nama target dan nominal wajib diisi.' });
+  }
+
+  const { data, error } = await supabase
+    .from('user_targets')
+    .insert([
+      {
+        user_id: userId,
+        target_name,
+        target_amount,
+        current_progress: current_progress || 0,
+      },
+    ])
+    .select();
+
+  if (error) {
+    return res
+      .status(500)
+      .json({ error: 'Gagal menyimpan target baru.', details: error.message });
+  }
+
+  res
+    .status(201)
+    .json({
+      success: true,
+      message: 'Data target berhasil ditambahkan.',
+      target: data,
+    });
+});
+
+// Memperbarui data target (Mengubah nama, nominal target, atau progress tabungan)
+router.put('/targets/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const targetId = req.params.id;
+  const { target_name, target_amount, current_progress } = req.body;
+
+  const { data, error } = await supabase
+    .from('user_targets')
+    .update({
+      target_name,
+      target_amount,
+      current_progress,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', targetId)
+    .eq('user_id', userId)
+    .select();
+
+  if (error) {
+    return res
+      .status(500)
+      .json({
+        error: 'Gagal memperbarui progress target.',
+        details: error.message,
+      });
+  }
+
+  res.json({
+    success: true,
+    message: 'Progress target berhasil diperbarui.',
+    target: data,
+  });
+});
+
+// Menghapus data target keuangan dari database
+router.delete('/targets/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const targetId = req.params.id;
+
+  const { error } = await supabase
+    .from('user_targets')
+    .delete()
+    .eq('id', targetId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return res
+      .status(500)
+      .json({ error: 'Gagal menghapus target.', details: error.message });
+  }
+
+  res.json({ success: true, message: 'Data target berhasil dihapus.' });
 });
 
 export default router;
