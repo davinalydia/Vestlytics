@@ -38,6 +38,25 @@
   gap: 0.5rem;
 }
 
+.strategy-info-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s, transform 0.2s;
+  margin-left: auto;
+}
+
+.strategy-info-btn:hover {
+  color: #38bdf8;
+  transform: scale(1.08);
+}
+
 .strategy-divider {
   height: 1px;
   background: linear-gradient(to right, transparent, #334155, transparent);
@@ -129,9 +148,6 @@
   flex-shrink: 0;
 }
 
-.strategy-input-wrapper.compact {
-  /* slightly smaller for inline pairs */
-}
 
 .strategy-input-wrapper.compact .strategy-input {
   padding: 0.5rem 0.5rem;

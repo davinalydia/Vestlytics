@@ -54,6 +54,10 @@ const faqData = [
   {
     question: "How is my portfolio data used by AI?",
     answer: "Your inputted data-including your current assets, monthly income, expenses, and emergency fund-is processed by the platform's Integrated Cashflow Engine to establish your \"Financial Awareness\". The AI uses this data to calculate your Financial Health Score and your Risk Match. By doing this, the AI ensures that any investment suggestions or insights it generates are highly personalized and safely tailored to your actual financial readiness."
+  },
+  {
+    question: "Is my financial data safe with Vestlytics?",
+    answer: "Yes, your financial data is safe. Vestlytics stores your profile and portfolio metrics securely using Supabase authentication and database encryption. We do not link to real bank accounts or execute actual stock transactions."
   }
 ];
 
@@ -107,7 +111,7 @@ const LandingPage = () => {
             </div>
             <div>
               <Link to="/register" className="bg-[#6366f1] text-white px-6 py-2.5 rounded-full font-medium text-sm shadow-lg shadow-indigo-500/20 btn-nav-premium">
-                Get The Access
+                Get Started
               </Link>
             </div>
           </nav>

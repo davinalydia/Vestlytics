@@ -9,6 +9,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -18,25 +19,36 @@ const LoginPage = () => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+    
+    let loginSuccess = false;
     try {
-      await api.login(email, password);
-      const profileRes = await api.getProfile();
-      if (profileRes && profileRes.success) {
-        const p = profileRes.profile_data;
-        const isCompleted = p.monthly_income > 0 && p.monthly_expenses > 0;
-        updateFinancialData({
-          monthlyIncome: p.monthly_income ? p.monthly_income.toLocaleString('id-ID') : '',
-          monthlyExpenses: p.monthly_expenses ? p.monthly_expenses.toLocaleString('id-ID') : '',
-          emergencyFund: p.emergency_fund ? p.emergency_fund.toLocaleString('id-ID') : '',
-          totalDebt: p.total_debt ? p.total_debt.toLocaleString('id-ID') : '',
-          monthlyDebtPayment: p.monthly_debt_payment ? p.monthly_debt_payment.toLocaleString('id-ID') : '',
-          isProfileCompleted: isCompleted,
-        });
-      }
-      navigate('/dashboard');
+      await api.login(email, password, rememberMe);
+      loginSuccess = true;
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
+      setIsLoading(false);
+      return;
+    }
+
+    if (loginSuccess) {
+      try {
+        const profileRes = await api.getProfile();
+        if (profileRes && profileRes.success) {
+          const p = profileRes.profile_data;
+          const isCompleted = p.monthly_income > 0 && p.monthly_expenses > 0;
+          updateFinancialData({
+            monthlyIncome: p.monthly_income ?? '',
+            monthlyExpenses: p.monthly_expenses ?? '',
+            emergencyFund: p.emergency_fund ?? '',
+            totalDebt: p.total_debt ?? '',
+            monthlyDebtPayment: p.monthly_debt_payment ?? '',
+            isProfileCompleted: isCompleted,
+          });
+        }
+      } catch (profileErr) {
+        console.error('Failed to load user profile details silently:', profileErr);
+      }
+      navigate('/dashboard');
       setIsLoading(false);
     }
   };
@@ -71,8 +83,7 @@ const LoginPage = () => {
       <div className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50">
         {/* Top Navbar */}
         <div className="w-full p-6 flex justify-end items-center gap-6 text-sm font-medium text-slate-600">
-          <Link to="/" className="hover:text-slate-900 transition-colors">Features</Link>
-          <Link to="/" className="hover:text-slate-900 transition-colors">About</Link>
+          <Link to="/" className="hover:text-slate-900 transition-colors">Vestlytics</Link>
           <Link to="/register" className="bg-[#0ea5e9] hover:bg-sky-500 text-white px-5 py-2 rounded-full transition-colors">
             Sign Up
           </Link>
@@ -101,6 +112,7 @@ const LoginPage = () => {
               <div>
                 <div className="flex justify-between items-center mb-1.5">
                   <label className="block text-sm font-semibold text-slate-800">Password <span className="text-red-500">*</span></label>
+                  <Link to="/forgot-password" className="text-xs text-cyan-500 hover:text-cyan-600 font-semibold transition-colors">Forgot password?</Link>
                 </div>
                 <div className="relative">
                   <input
@@ -122,7 +134,12 @@ const LoginPage = () => {
               </div>
 
               <div className="flex items-start gap-2 pt-1">
-                <input type="checkbox" className="mt-1 w-4 h-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500" />
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500" 
+                />
                 <span className="text-sm text-slate-600">
                   Keep me signed in
                 </span>

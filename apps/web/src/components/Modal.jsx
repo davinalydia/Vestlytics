@@ -1,20 +1,48 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import './Modal.css';
 
-export const Modal = ({ isOpen, onClose, title, children }) => {
-  return (
+export const Modal = ({ isOpen, onClose, title, children, className }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.style.overflowY = 'hidden';
+      }
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.style.overflowY = '';
+      }
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.style.overflowY = '';
+      }
+    };
+  }, [isOpen]);
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="modal-backdrop"
+          className={`modal-backdrop ${className ? className + '-backdrop' : ''}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className="modal-container"
+            className={`modal-container ${className || ''}`}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
@@ -33,6 +61,7 @@ export const Modal = ({ isOpen, onClose, title, children }) => {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

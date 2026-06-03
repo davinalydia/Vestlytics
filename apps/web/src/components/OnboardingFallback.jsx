@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Lock, Sparkles } from 'lucide-react';
 
-export const OnboardingFallback = ({ pageName }) => {
+export const OnboardingFallback = ({ pageName, onUnlock }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] p-8 text-center animate-fade-in">
       <div className="relative mb-6">
@@ -18,15 +18,24 @@ export const OnboardingFallback = ({ pageName }) => {
         Unlock {pageName}
       </h2>
       <p className="text-slate-500 max-w-md text-sm md:text-base mb-8 leading-relaxed">
-        To activate AI-powered predictive analytics, risk scoring, and personalized investment suggestions, we first need to understand your wallet's capacity.
+        You are required to fill out your financial profile values in the <strong>"Financial Profile"</strong> container on the <strong>My Finances - Profile & Income</strong> page to unlock this page and activate AI analytics.
       </p>
 
-      <Link 
-        to="/my-finances" 
-        className="relative group overflow-hidden bg-[#0ea5e9] hover:bg-sky-500 text-white px-8 py-3.5 rounded-xl font-semibold shadow-lg shadow-sky-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] inline-flex items-center gap-2"
-      >
-        Complete your Financial Profile to unlock AI Analytics
-      </Link>
+      {onUnlock ? (
+        <button 
+          onClick={onUnlock}
+          className="relative group overflow-hidden bg-[#0ea5e9] hover:bg-sky-500 text-white px-8 py-3.5 rounded-xl font-semibold shadow-lg shadow-sky-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] inline-flex items-center gap-2 cursor-pointer border-none"
+        >
+          Go to My Finances - Profile & Income
+        </button>
+      ) : (
+        <Link 
+          to="/my-finances?tab=profile" 
+          className="relative group overflow-hidden bg-[#0ea5e9] hover:bg-sky-500 text-white px-8 py-3.5 rounded-xl font-semibold shadow-lg shadow-sky-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] inline-flex items-center gap-2 text-decoration-none"
+        >
+          Go to My Finances - Profile & Income
+        </Link>
+      )}
     </div>
   );
 };

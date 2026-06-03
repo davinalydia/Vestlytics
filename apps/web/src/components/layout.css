@@ -275,7 +275,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 2rem;
-  z-index: 5;
+  z-index: 20;
   flex-shrink: 0;
 }
 
@@ -390,4 +390,12 @@
   .page-subtitle {
     display: none;
   }
+}
+
+.header-info-btn {
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+.header-info-btn:hover {
+  color: #38bdf8 !important;
 }

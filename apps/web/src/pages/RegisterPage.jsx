@@ -49,6 +49,13 @@ const RegisterPage = () => {
   const navigate = useNavigate();
   const { updateFinancialData } = useContext(UserFinancialContext);
 
+  const validatePasswordRules = (pass) => {
+    return pass.length >= 8 &&
+      /[A-Z]/.test(pass) &&
+      /\d/.test(pass) &&
+      /[^A-Za-z0-9]/.test(pass);
+  };
+
   const getPasswordStrength = (pass) => {
     let score = 0;
     if (pass.length >= 8) score++;
@@ -60,8 +67,8 @@ const RegisterPage = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (getPasswordStrength(password) < 3) {
-      setError('Password must meet at least 3 criteria (Strong) to create an account.');
+    if (!validatePasswordRules(password)) {
+      setError('Password does not meet all security requirements.');
       return;
     }
     if (password !== confirmPassword) {
@@ -130,50 +137,12 @@ const RegisterPage = () => {
             <span className="text-3xl font-semibold tracking-wider">VESTLYTICS</span>
           </div>
 
-          <div className="inline-block bg-[#0891b2]/20 border border-[#0891b2]/30 text-cyan-400 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
-            • 3-Step Onboarding
-          </div>
           <h1 className="text-4xl lg:text-5xl font-bold leading-tight mb-6">
             Start your <span className="text-cyan-400">smarter</span><br />investment journey
           </h1>
           <p className="text-slate-400 text-lg max-w-md mb-12">
             Creating an account takes less than 2 minutes. You'll be analyzing your portfolio with AI before you know it.
           </p>
-
-          <div className="space-y-8">
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-cyan-500 text-white flex items-center justify-center font-bold flex-shrink-0 z-10 relative">
-                1
-                {/* Connector line */}
-                <div className="absolute top-8 left-1/2 w-0.5 h-12 bg-slate-700 -translate-x-1/2"></div>
-              </div>
-              <div>
-                <h3 className="font-bold text-white">Create your account</h3>
-                <p className="text-slate-500 text-sm">Basic info - name, email, password</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold flex-shrink-0 z-10 relative">
-                2
-                <div className="absolute top-8 left-1/2 w-0.5 h-12 bg-slate-800 -translate-x-1/2"></div>
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-300">Set up financial profile</h3>
-                <p className="text-slate-500 text-sm">Income, expenses & emergency fund</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold flex-shrink-0">
-                3
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-300">Explore your dashboard</h3>
-                <p className="text-slate-500 text-sm">AI insights ready instantly</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -181,8 +150,7 @@ const RegisterPage = () => {
       <div className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50">
         {/* Top Navbar */}
         <div className="w-full p-6 flex justify-end items-center gap-6 text-sm font-medium text-slate-600">
-          <Link to="/" className="hover:text-slate-900 transition-colors">Features</Link>
-          <Link to="/" className="hover:text-slate-900 transition-colors">About</Link>
+          <Link to="/" className="hover:text-slate-900 transition-colors">Vestlytics</Link>
           <Link to="/login" className="bg-[#0ea5e9] hover:bg-sky-500 text-white px-5 py-2 rounded-full transition-colors">
             Sign In
           </Link>
@@ -235,14 +203,24 @@ const RegisterPage = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-slate-800 mb-1.5">Phone number <span className="text-red-500">*</span></label>
-                <input
-                  type="tel"
-                  placeholder="+62 812 xxxx xxxx"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-colors placeholder:text-slate-400"
-                  required
-                />
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-cyan-500/20 focus-within:border-cyan-500 transition-all">
+                  <div className="bg-slate-100 px-4 py-2.5 text-slate-500 border-r border-slate-200 flex items-center justify-center font-medium text-sm select-none">
+                    +62
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="812 3456 7890"
+                    value={phone}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      // Strip leading zero if present
+                      val = val.replace(/^0+/, '');
+                      setPhone(val);
+                    }}
+                    className="flex-1 px-4 py-2.5 focus:outline-none placeholder:text-slate-400 text-slate-900 bg-white"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
@@ -278,9 +256,25 @@ const RegisterPage = () => {
                     {strengthInfo.text}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-2 leading-relaxed bg-slate-50 p-2 rounded-md border border-slate-100">
-                  <strong className="text-slate-700">Guide:</strong> Password must be at least 8 characters long, contain numbers, at least 1 uppercase letter, and at least 1 special character.
-                </p>
+                <div className="text-[11px] mt-2 space-y-1 bg-slate-50 p-2 rounded-md border border-slate-100">
+                  <div className="font-semibold text-slate-700 mb-1">Password Requirements:</div>
+                  <div className={`flex items-center gap-1.5 transition-colors duration-200 ${password.length >= 8 ? 'text-green-600 font-medium' : 'text-slate-500'}`}>
+                    <span>{password.length >= 8 ? '✓' : '○'}</span>
+                    <span>Minimum 8 characters</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 transition-colors duration-200 ${/[A-Z]/.test(password) ? 'text-green-600 font-medium' : 'text-slate-500'}`}>
+                    <span>{/[A-Z]/.test(password) ? '✓' : '○'}</span>
+                    <span>At least 1 uppercase letter</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 transition-colors duration-200 ${/\d/.test(password) ? 'text-green-600 font-medium' : 'text-slate-500'}`}>
+                    <span>{/\d/.test(password) ? '✓' : '○'}</span>
+                    <span>At least 1 number</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 transition-colors duration-200 ${/[^A-Za-z0-9]/.test(password) ? 'text-green-600 font-medium' : 'text-slate-500'}`}>
+                    <span>{/[^A-Za-z0-9]/.test(password) ? '✓' : '○'}</span>
+                    <span>At least 1 special character</span>
+                  </div>
+                </div>
                 {error && <p className="text-red-500 text-xs mt-2 font-medium">{error}</p>}
               </div>
 

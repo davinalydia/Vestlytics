@@ -28,15 +28,22 @@
   justify-content: center;
 }
 
+.metric-card.health-card {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .metric-label {
   font-size: 0.85rem;
   color: #94a3b8;
   margin-bottom: 0.5rem;
 }
 
-.metric-value {
+.metric-card .metric-value {
   font-size: 1.8rem;
   font-weight: 700;
+  color: #ffffff !important;
   margin-bottom: 0.25rem;
 }
 

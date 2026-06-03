@@ -14,12 +14,12 @@ const getHeaders = () => {
 // Fallback Mock Data
 const MOCK_DATA = {
   profile: {
-    monthly_income: 12000000,
-    monthly_expenses: 8000000,
-    emergency_fund: 24000000,
-    total_debt: 24000000,
-    monthly_debt_payment: 2000000,
-    net_worth: 138000000,
+    monthly_income: 0,
+    monthly_expenses: 0,
+    emergency_fund: 0,
+    total_debt: 0,
+    monthly_debt_payment: 0,
+    net_worth: 0,
   },
   assets: [
     { asset_category: 'Stocks', value: 55000000, return_ytd: 12.5, performance: 'Outperform', last_updated: '2026-05-10T00:00:00.000Z' },
@@ -96,12 +96,12 @@ const MOCK_DATA = {
 // Main API Client Wrapper
 export const api = {
   // Authentication
-  async login(email, password) {
+  async login(email, password, rememberMe) {
     try {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
       if (!res.ok) throw new Error('Authentication failed');
       const data = await res.json();
@@ -114,7 +114,6 @@ export const api = {
       return { success: true, message: 'Logged in locally', user: { email } };
     }
   },
-
   async register(email, password) {
     try {
       const res = await fetch(`${API_URL}/auth/register`, {
@@ -128,6 +127,89 @@ export const api = {
     } catch (err) {
       console.warn('Register API failed, registering locally:', err.message);
       return { success: true, message: 'Registered locally' };
+    }
+  },
+
+  async getMe() {
+    try {
+      const res = await fetch(`${API_URL}/auth/me`, { headers: getHeaders() });
+      if (!res.ok) throw new Error('Failed to load profile');
+      return await res.json();
+    } catch (err) {
+      console.warn('getMe API failed, using local storage fallback:', err.message);
+      const localProfile = localStorage.getItem('vestlytics_user_me');
+      if (localProfile) {
+        return { success: true, user: JSON.parse(localProfile) };
+      }
+      return {
+        success: true,
+        user: {
+          id: 'mock-user-id',
+          email: 'crazykiller@email.com',
+          full_name: 'Crazy Killer',
+          username: 'crazykiller',
+          phone_number: '+62 812 3456 7890',
+          avatar_url: ''
+        }
+      };
+    }
+  },
+
+  async updateProfile(payload) {
+    try {
+      const res = await fetch(`${API_URL}/auth/update-profile`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update profile');
+      }
+      const data = await res.json();
+      localStorage.setItem('vestlytics_user_me', JSON.stringify(data.user));
+      return data;
+    } catch (err) {
+      console.warn('updateProfile API failed, using simulated success:', err.message);
+      const localProfile = localStorage.getItem('vestlytics_user_me');
+      const currentUser = localProfile ? JSON.parse(localProfile) : {
+        id: 'mock-user-id',
+        email: 'crazykiller@email.com',
+        full_name: 'Crazy Killer',
+        username: 'crazykiller',
+        phone_number: '+62 812 3456 7890',
+        avatar_url: ''
+      };
+      const updatedUser = {
+        ...currentUser,
+        full_name: payload.full_name !== undefined ? payload.full_name : currentUser.full_name,
+        username: payload.username !== undefined ? payload.username : currentUser.username,
+        phone_number: payload.phone_number !== undefined ? payload.phone_number : currentUser.phone_number,
+        avatar_url: payload.avatar_url !== undefined ? payload.avatar_url : currentUser.avatar_url,
+      };
+      localStorage.setItem('vestlytics_user_me', JSON.stringify(updatedUser));
+      return { success: true, message: 'Profile updated locally', user: updatedUser };
+    }
+  },
+
+  async changePassword(oldPassword, newPassword) {
+    try {
+      const res = await fetch(`${API_URL}/auth/change-password`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to change password');
+      }
+      return await res.json();
+    } catch (err) {
+      console.warn('changePassword API failed, simulating success:', err.message);
+      if (oldPassword === 'wrong') {
+        throw new Error('Old password is incorrect');
+      }
+      return { success: true, message: 'Password updated locally' };
     }
   },
 

@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { UserFinancialContext } from '../context/UserFinancialContext';
 import { OnboardingFallback } from '../components/OnboardingFallback';
 import { SkeletonLoader } from '../components/SkeletonLoader';
+import { Modal } from '../components/Modal';
 import { api } from '../services/api';
 import './marketAnalysis.css';
 import './dashboard.css'; // For card styles
@@ -14,7 +15,36 @@ const MarketAnalysisPage = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const [isLoadingList, setIsLoadingList] = useState(financialData.isProfileCompleted);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(financialData.isProfileCompleted);
+  const [analyzedTickers, setAnalyzedTickers] = useState(['BBCA', 'ASII', 'TLKM']);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const getTickerDetails = (ticker) => {
+    const stock = availableStocks.find(s => s.ticker === ticker);
+    if (stock) {
+      return {
+        price: stock.price,
+        change: stock.change_pct
+      };
+    }
+    const fallbacks = {
+      BBCA: { price: 9450, change: 1.2 },
+      ASII: { price: 4800, change: -0.8 },
+      TLKM: { price: 3210, change: 0.4 },
+      BBRI: { price: 4800, change: -0.8 },
+      GOTO: { price: 62, change: -3.1 }
+    };
+    return fallbacks[ticker] || { price: 0, change: 0 };
+  };
+  const handleRemoveTicker = (tickerToRemove) => {
+    if (analyzedTickers.length <= 1) return;
+
+    const newTickers = analyzedTickers.filter(t => t !== tickerToRemove);
+    setAnalyzedTickers(newTickers);
+
+    if (selectedTicker === tickerToRemove) {
+      setSelectedTicker(newTickers[0]);
+    }
+  };
   // Load available stocks on mount
   useEffect(() => {
     if (!financialData.isProfileCompleted) {
@@ -98,25 +128,59 @@ const MarketAnalysisPage = () => {
   return (
     <div className="market-container animate-fade-in">
       
-      {/* Stock Selection & Top Metrics */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-        <div className="flex-1">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Select Equity Asset</label>
-          {isLoadingList ? (
-            <div className="h-10 bg-slate-800 rounded animate-pulse w-48"></div>
-          ) : (
-            <select
-              value={selectedTicker}
-              onChange={(e) => setSelectedTicker(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-white rounded-xl px-4 py-2.5 font-bold outline-none focus:border-cyan-500 cursor-pointer min-w-[200px]"
+      {/* Stock Selection Cards */}
+      <div className="stock-cards-container">
+        {analyzedTickers.map((ticker) => {
+          const details = getTickerDetails(ticker);
+          const isSelected = selectedTicker === ticker;
+          const isPositive = details.change >= 0;
+
+          return (
+            <div
+              key={ticker}
+              className={`stock-select-card ${isSelected ? 'selected' : ''}`}
+              onClick={() => setSelectedTicker(ticker)}
             >
-              {availableStocks.map((stock) => (
-                <option key={stock.ticker} value={stock.ticker}>
-                  {stock.ticker} (Rp {stock.price.toLocaleString('id-ID')})
-                </option>
-              ))}
-            </select>
-          )}
+              {analyzedTickers.length > 1 && (
+                <button
+                  type="button"
+                  className="stock-card-close-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveTicker(ticker);
+                  }}
+                  title="Hapus analisis"
+                >
+                  &times;
+                </button>
+              )}
+              <div className="stock-card-ticker">{ticker}</div>
+              <div className="stock-card-price">Rp {details.price.toLocaleString('id-ID')}</div>
+              <div className={`stock-card-change ${isPositive ? 'up' : 'down'}`}>
+                {isPositive ? `▲ +${details.change}%` : `▼ ${details.change}%`}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Plus Card to add a stock */}
+        {analyzedTickers.length < availableStocks.length && (
+          <button 
+            type="button" 
+            className="stock-add-card" 
+            onClick={() => setIsModalOpen(true)}
+            title="Tambah saham untuk dianalisis"
+          >
+            +
+          </button>
+        )}
+      </div>
+
+      {/* Top Metrics Info Panel */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl mb-6">
+        <div>
+          <h2 className="text-lg font-bold text-white mb-1">Currently Analyzing: {selectedTicker}</h2>
+          <p className="text-xs text-slate-400">Deep Learning LSTM analysis feed for {selectedTicker} equity asset.</p>
         </div>
         
         <div className="flex gap-6 items-center">
@@ -229,7 +293,7 @@ const MarketAnalysisPage = () => {
         {/* AI Insight narratives */}
         <div className="dash-card flex flex-col justify-between">
           <div>
-            <h3 className="dash-card-title mb-4">Market Sentiment & Advice</h3>
+            <h3 className="dash-card-title mb-4">AI Insight</h3>
             {isLoadingAnalysis ? (
               <SkeletonLoader type="text" rows={4} />
             ) : (
@@ -255,6 +319,81 @@ const MarketAnalysisPage = () => {
         </div>
 
       </div>
+
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title="Select Stock for Analysis"
+        className="large-top-modal"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {availableStocks
+            .filter(stock => !analyzedTickers.includes(stock.ticker))
+            .map((stock) => {
+              const isPositive = stock.change_pct >= 0;
+              return (
+                <div 
+                  key={stock.ticker}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.75rem 0',
+                    borderBottom: '1px solid #f1f5f9'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    {/* Placeholder logo */}
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: '#cbd5e1',
+                      borderRadius: '8px'
+                    }}></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>{stock.ticker}</span>
+                      <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Rp {stock.price.toLocaleString('id-ID')}</span>
+                      <span style={{ 
+                        fontSize: '0.8rem', 
+                        fontWeight: '700', 
+                        color: isPositive ? '#10b981' : '#ef4444' 
+                      }}>
+                        {isPositive ? `▲ +${stock.change_pct}%` : `▼ ${stock.change_pct}%`}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '6px',
+                      fontWeight: '600',
+                      fontSize: '0.85rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onClick={() => {
+                      setAnalyzedTickers(prev => [...prev, stock.ticker]);
+                      setSelectedTicker(stock.ticker);
+                      setIsModalOpen(false);
+                    }}
+                    className="hover:bg-blue-700"
+                  >
+                    Select Stock
+                  </button>
+                </div>
+              );
+            })}
+          {availableStocks.filter(stock => !analyzedTickers.includes(stock.ticker)).length === 0 && (
+            <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.9rem', padding: '1rem 0' }}>
+              All stocks are currently being analyzed.
+            </div>
+          )}
+        </div>
+      </Modal>
       
     </div>
   );

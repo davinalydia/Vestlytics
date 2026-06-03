@@ -6,6 +6,7 @@
   max-width: 1000px;
   position: relative;
   z-index: 10;
+  padding-bottom: 3rem;
 }
 
 .help-contact-card {

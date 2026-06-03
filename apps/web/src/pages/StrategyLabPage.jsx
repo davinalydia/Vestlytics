@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { FlaskConical, BarChart3, ShieldAlert, Sparkles, RotateCcw, Play } from 'lucide-react';
+import { FlaskConical, BarChart3, ShieldAlert, Sparkles, RotateCcw, Play, Info } from 'lucide-react';
+import { Modal } from '../components/Modal';
 import './strategyLab.css';
 
 // ============================================================
@@ -277,6 +278,7 @@ const StrategyLabPage = () => {
   const [monthlyIncome, setMonthlyIncome] = useState('');
   const [monthlyExpense, setMonthlyExpense] = useState('');
   const [emergencyFund, setEmergencyFund] = useState('');
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
   // Simulation result
   const [result, setResult] = useState(null);
@@ -341,7 +343,15 @@ const StrategyLabPage = () => {
       <div className="strategy-sidebar">
         <div className="strategy-sidebar-title">
           <FlaskConical size={14} />
-          Portfolio Setup
+          <span>Portfolio Setup</span>
+          <button
+            type="button"
+            onClick={() => setIsGuideModalOpen(true)}
+            className="strategy-info-btn"
+            title="Strategy Lab Guide"
+          >
+            <Info size={14} />
+          </button>
         </div>
 
         <div className="strategy-form-group">
@@ -702,6 +712,167 @@ const StrategyLabPage = () => {
         </div>
 
       </div>
+
+      {/* Strategy Lab Guide Modal */}
+      <Modal
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        title="Strategy Lab Guide"
+        className="large-top-modal"
+      >
+        <div className="space-y-6 text-left text-slate-700" style={{ fontSize: '0.92rem', lineHeight: '1.6', color: '#334155' }}>
+          
+          <section className="mb-6">
+            <h3 className="text-base font-bold text-slate-900 mb-3 pb-1 border-b border-slate-100 uppercase tracking-wide">
+              Part 1: Overview of Each Container’s Functions
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-bold text-slate-800">1. Left Sidebar (Parameter & Input Panel)</h4>
+                <p className="text-slate-600 mt-1">
+                  This container on the left is the <strong>“engine room.”</strong> Its function is to capture all of the user’s financial variables. This panel is intentionally divided into three subcategories (Portfolio Setup, Risk Parameters, and Financial Health) so that compound interest calculations can be directly linked to the reality of the user’s wallet.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800">2. Top Metrics (Summary Numbers Container)</h4>
+                <p className="text-slate-600 mt-1">
+                  Located at the very top on the right, this container provides instant results to the user immediately after the “Run Simulation” button is pressed.
+                </p>
+                <ul className="list-disc pl-5 mt-1 space-y-1 text-slate-600">
+                  <li><strong>Portfolio Value:</strong> Displays the final total amount in the base case scenario.</li>
+                  <li><strong>Total Return:</strong> Displays the gross return percentage relative to the initial investment.</li>
+                  <li><strong>Risk Score:</strong> Converts the volatility percentage into a 1–10 score that is easier for the general public to understand.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800">3. Projected Portfolio Growth (Projection Chart Container)</h4>
+                <p className="text-slate-600 mt-1">
+                  The primary function of this container is to visualize the power of compound interest over time. Using Recharts’ AreaChart, this graph distinguishes the gray dashed line (deposited capital) from the colored area (asset growth). The wider the gap between the dashed line and the colored area, the greater the profit earned.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800">4. Scenario Comparison (Market Conditions Comparison Container)</h4>
+                <p className="text-slate-600 mt-1">
+                  Stock or crypto markets don’t always rise. This container helps manage user expectations by presenting three calculation scenarios:
+                </p>
+                <ul className="list-disc pl-5 mt-1 space-y-1 text-slate-600">
+                  <li><strong>Bull Market (Optimistic):</strong> Results when the market is performing exceptionally well.</li>
+                  <li><strong>Base Case (Normal):</strong> Standard industry-expected results.</li>
+                  <li><strong>Bear Market (Pessimistic):</strong> Worst-case results if the market is declining, so users are mentally prepared for potential temporary losses.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800">5. Insight Box (AI Decision Container)</h4>
+                <p className="text-slate-600 mt-1">
+                  This is the most vital feature. Instead of just providing numbers, this container analyzes the user’s financial health metrics (Monthly Take-Home Pay and Emergency Fund) and then issues a Verdict. If a user attempts to invest too heavily despite having an insufficient emergency fund, this container will activate and display a “High Risk” warning.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-base font-bold text-slate-900 mb-3 pb-1 border-b border-slate-100 uppercase tracking-wide">
+              Part 2: Filling Guide & Purpose of Each Column
+            </h3>
+            <p className="text-slate-600 mb-3">
+              To ensure users get accurate simulation results, here is a guide for filling out the panel on the left:
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-bold text-slate-800">A. Portfolio Setup (Initial Settings)</h4>
+                <p className="text-slate-600 mt-1">
+                  The focus of this section is to define the starting point and end goal of the investment journey.
+                </p>
+                <div className="mt-2 pl-4 border-l-2 border-slate-200 space-y-2">
+                  <div>
+                    <strong className="text-slate-700">Initial Investment (IDR):</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> To determine the initial lump-sum investment deposited in the first month.</li>
+                      <li><strong>Filling Guide:</strong> If the user is starting from scratch, enter 0. If the user is transferring funds from another savings account to begin investing, enter the total amount (e.g., 10,000,000).</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-slate-700">Start Date & End Date:</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> To calculate the total number of months/years the funds will be held and compounded by the simulation engine.</li>
+                      <li><strong>Filling Guide:</strong> Flexible, but it is highly recommended that the time range (End Date) be at least 3–5 years in the future so that the effect of compound interest is clearly visible on the graph.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800">B. Risk Parameters (Return & Risk Parameters)</h4>
+                <p className="text-slate-600 mt-1">
+                  The focus of this section is to determine which investment instrument is being simulated (Stocks, Mutual Funds, or Cryptocurrency).
+                </p>
+                <div className="mt-2 pl-4 border-l-2 border-slate-200 space-y-2">
+                  <div>
+                    <strong className="text-slate-700">Expected Annual Return (%):</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> The average expected return over one year.</li>
+                      <li><strong>Filling Guide:</strong> For Money Market Mutual Funds, typically 4–6%. For Bonds/SBN, around 6–8%. For Stocks (IHSG), the average is 10–12%.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-slate-700">Volatility / Risk Level (%):</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> To determine how extreme the asset’s price can rise and fall within a year. This figure determines the distance between the Bull Market and Bear Market curves.</li>
+                      <li><strong>Filling Guide:</strong> The higher the potential return, the higher the volatility should be set. (For example, Crypto can have volatility of 30–50%, while Money Market Mutual Funds are closer to 1–2%).</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-slate-700">Monthly DCA Contribution (IDR):</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> The amount of money (Dollar Cost Averaging) to be consistently deposited every month.</li>
+                      <li><strong>Filling Guide:</strong> Enter a realistic amount set aside from your salary (e.g., 1,000,000).</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800">C. Financial Health Check (Wallet Reality Check)</h4>
+                <p className="text-slate-600 mt-1">
+                  The data here does not appear in the investment chart; instead, it is used by the system to evaluate whether the DCA amount above is safe or could jeopardize the user’s finances.
+                </p>
+                <div className="mt-2 pl-4 border-l-2 border-slate-200 space-y-2">
+                  <div>
+                    <strong className="text-slate-700">Monthly Income & Expense (IDR):</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> To determine the user’s “Net Savings” or monthly remaining funds.</li>
+                      <li><strong>Filling Guide:</strong> Enter the total monthly net salary/income under Income. Enter all primary, secondary living expenses, and debt installments under Expense.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-slate-700">Emergency Fund Saved (IDR):</strong>
+                    <ul className="list-disc pl-5 text-slate-600 text-sm">
+                      <li><strong>Purpose:</strong> To check the thickness of the user’s “safety cushion” before diving into risky investments.</li>
+                      <li><strong>Filling Guide:</strong> Enter the total cash/liquid savings the user currently holds that are strictly allocated for emergencies.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex justify-end pt-4 border-t border-slate-100 mt-6">
+            <button
+              onClick={() => setIsGuideModalOpen(false)}
+              className="px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold cursor-pointer border-none shadow transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 };
