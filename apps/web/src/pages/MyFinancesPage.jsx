@@ -6,7 +6,6 @@ import {
   Loader2,
   Check,
   Trash2,
-  X,
   Edit2,
   RotateCcw,
 } from 'lucide-react';
@@ -28,6 +27,8 @@ const MyFinancesPage = () => {
     addFinancialTarget,
     updateFinancialTarget,
     deleteFinancialTarget,
+    healthScore,
+    healthStatus,
   } = useContext(UserFinancialContext);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -171,10 +172,8 @@ const MyFinancesPage = () => {
     (sum, item) => sum + parseFloat(item.value || 0),
     0,
   );
-
-  const baseAssets = totalAssetsSum > 0 ? totalAssetsSum : emergVal;
-  const dynamicNetWorth = baseAssets - debtVal;
-  const parsedNetWorth = dynamicNetWorth;
+  const dynamicNetWorth =
+    (totalAssetsSum > 0 ? totalAssetsSum : emergVal) - debtVal;
 
   const pieData =
     totalAssetsSum > 0
@@ -213,11 +212,7 @@ const MyFinancesPage = () => {
       year: 'numeric',
     });
 
-    const isAlreadyExists = cashflowListToUse.some(
-      (c) => c.month_period === formattedMonth,
-    );
-
-    if (!isAlreadyExists) {
+    if (!cashflowListToUse.some((c) => c.month_period === formattedMonth)) {
       cashflowListToUse.push({
         id: 'draft-id',
         month_period: `${formattedMonth} (Draft)`,
@@ -232,14 +227,8 @@ const MyFinancesPage = () => {
   const sortedCashflow = cashflowListToUse.sort((a, b) => {
     if (a.month_period.includes('(Draft)')) return -1;
     if (b.month_period.includes('(Draft)')) return 1;
-    const dateA = new Date(a.month_period);
-    const dateB = new Date(b.month_period);
-    return dateB - dateA;
+    return new Date(b.month_period) - new Date(a.month_period);
   });
-
-  // Mengambil healthScore dan status terpusat dari context global
-  const healthScore = financialData.healthScore || 0;
-  const healthStatus = financialData.healthStatus || 'Needs improvement';
 
   const handleSubmitProfile = async () => {
     setIsSubmitting(true);
@@ -255,10 +244,8 @@ const MyFinancesPage = () => {
         monthly_debt_payment: parseCleanNum(monthlyDebtPayment),
       };
 
-      // 1. Menyimpan profil utama ke backend
       await api.saveProfile(payload);
 
-      // 2. Memperbarui state global dan membuka status Onboarding
       updateFinancialData({
         monthlyIncome,
         monthlyExpenses,
@@ -269,20 +256,10 @@ const MyFinancesPage = () => {
         isProfileCompleted: true,
       });
 
-      // 3. Melakukan sinkronisasi ulang data terbaru dari backend termasuk profil untuk mengupdate healthScore
-      const [profileRes, assetsRes, cashflowRes] = await Promise.all([
-        api.getProfile(),
+      const [assetsRes, cashflowRes] = await Promise.all([
         api.getAssets(),
         api.getCashflow(),
       ]);
-
-      if (profileRes && profileRes.success) {
-        updateFinancialData({
-          healthScore: profileRes.metrics?.health_score || 0,
-          healthStatus:
-            profileRes.metrics?.health_status || 'Needs improvement',
-        });
-      }
 
       if (assetsRes && assetsRes.success)
         setRiskMetrics(assetsRes.risk_metrics);
@@ -311,16 +288,31 @@ const MyFinancesPage = () => {
   };
 
   const handleResetCashflow = async () => {
-    const isConfirm = window.confirm(
-      'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas? Data tidak dapat dipulihkan.',
-    );
-    if (isConfirm) {
+    if (
+      window.confirm(
+        'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas?',
+      )
+    ) {
       try {
         await api.resetCashflow();
         setCashflowHistory([]);
       } catch (err) {
         console.error('Gagal mereset riwayat:', err);
       }
+    }
+  };
+
+  // FUNGSI FIXED: Menghapus data dari Backend secara penuh dan menyinkronkannya dengan UI
+  const handleDeleteAssetBackend = async (assetRow) => {
+    try {
+      if (assetRow.id) {
+        // Melakukan request hapus ke server backend
+        await api.deleteAsset(assetRow.id);
+      }
+      // Memperbarui state Context global agar aset hilang dari UI
+      deleteAssetCategory(assetRow.asset_category);
+    } catch (error) {
+      console.error('Gagal menghapus aset secara penuh dari backend:', error);
     }
   };
 
@@ -379,11 +371,8 @@ const MyFinancesPage = () => {
       isDefault: false,
     };
 
-    if (editingTargetId) {
-      updateFinancialTarget(editingTargetId, targetData);
-    } else {
-      addFinancialTarget(targetData);
-    }
+    if (editingTargetId) updateFinancialTarget(editingTargetId, targetData);
+    else addFinancialTarget(targetData);
 
     setIsTargetModalOpen(false);
     setEditingTargetId(null);
@@ -395,7 +384,6 @@ const MyFinancesPage = () => {
 
   return (
     <div className='finances-container animate-fade-in'>
-      {/* Tombol Pemilih Tab (Tab Switcher) */}
       <div className='tabs-container'>
         <button
           className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -413,9 +401,7 @@ const MyFinancesPage = () => {
 
       {activeTab === 'profile' && (
         <div className='profile-grid'>
-          {/* Kolom Kiri */}
           <div className='flex-col-gap'>
-            {/* Formulir Profil Keuangan Utama */}
             <div className='dash-card'>
               <div className='dash-card-header'>
                 <h3 className='dash-card-title'>Financial Profile</h3>
@@ -446,7 +432,6 @@ const MyFinancesPage = () => {
                   </label>
                   <input
                     id='profileMonth'
-                    name='profileMonth'
                     type='month'
                     className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
                     value={profileMonth}
@@ -459,7 +444,6 @@ const MyFinancesPage = () => {
                     }}
                   />
                 </div>
-
                 <div className='form-group'>
                   <label className='form-label' htmlFor='monthlyIncome'>
                     Monthly Income
@@ -468,7 +452,6 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='monthlyIncome'
-                      name='monthlyIncome'
                       type='text'
                       className='form-input'
                       value={monthlyIncome}
@@ -487,7 +470,6 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='monthlyExpenses'
-                      name='monthlyExpenses'
                       type='text'
                       className='form-input'
                       value={monthlyExpenses}
@@ -506,7 +488,6 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='emergencyFund'
-                      name='emergencyFund'
                       type='text'
                       className='form-input'
                       value={emergencyFund}
@@ -525,7 +506,6 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='totalDebt'
-                      name='totalDebt'
                       type='text'
                       className='form-input'
                       value={totalDebt}
@@ -544,7 +524,6 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='monthlyDebtPayment'
-                      name='monthlyDebtPayment'
                       type='text'
                       className='form-input'
                       value={monthlyDebtPayment}
@@ -558,7 +537,6 @@ const MyFinancesPage = () => {
                     />
                   </div>
                 </div>
-
                 <div className='form-group'>
                   <label className='form-label' htmlFor='netWorth'>
                     Net Worth (Auto-Calculated)
@@ -575,7 +553,6 @@ const MyFinancesPage = () => {
                     </span>
                     <input
                       id='netWorth'
-                      name='netWorth'
                       type='text'
                       className='form-input'
                       value={dynamicNetWorth.toLocaleString('id-ID')}
@@ -587,7 +564,6 @@ const MyFinancesPage = () => {
               </div>
             </div>
 
-            {/* Riwayat Arus Kas Bulanan */}
             <div className='dash-card dark'>
               <div
                 className='dash-card-header items-center'
@@ -615,7 +591,6 @@ const MyFinancesPage = () => {
                   <RotateCcw size={12} /> Reset Table
                 </button>
               </div>
-
               {isLoadingAssets ? (
                 <SkeletonLoader type='table' rows={3} />
               ) : (
@@ -669,7 +644,6 @@ const MyFinancesPage = () => {
                               <button
                                 onClick={() => handleDeleteCashflow(row.id)}
                                 className='text-slate-500 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 transition-colors inline-block'
-                                title='Hapus Riwayat'
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -693,15 +667,12 @@ const MyFinancesPage = () => {
             </div>
           </div>
 
-          {/* Kolom Kanan */}
           <div className='flex-col-gap'>
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-              {/* Widget Pelacak Kesehatan Finansial */}
               <div className='dash-card dark'>
                 <h3 className='dash-card-title text-white mb-6'>
                   Financial Health Tracker
                 </h3>
-
                 <div className='health-item'>
                   <span className='health-label'>Income/Month</span>
                   <div className='health-bar-container'>
@@ -715,7 +686,6 @@ const MyFinancesPage = () => {
                   </div>
                   <span className='health-badge bg-green-soft'>Good</span>
                 </div>
-
                 <div className='health-item'>
                   <span className='health-label'>Expense/Month</span>
                   <div className='health-bar-container'>
@@ -733,7 +703,6 @@ const MyFinancesPage = () => {
                   </div>
                   <span className='health-badge bg-yellow-soft'>Stable</span>
                 </div>
-
                 <div className='health-item'>
                   <span className='health-label'>Net Savings Rate</span>
                   <div className='health-bar-container'>
@@ -755,7 +724,6 @@ const MyFinancesPage = () => {
                     <span className='health-badge bg-green-soft'>Good</span>
                   )}
                 </div>
-
                 <div className='health-item'>
                   <span className='health-label'>Debt Ratio</span>
                   <div className='health-bar-container'>
@@ -771,7 +739,6 @@ const MyFinancesPage = () => {
                   </div>
                   <span className='health-badge bg-yellow-soft'>Stable</span>
                 </div>
-
                 <div className='mt-6 border-t border-slate-800 pt-4'>
                   <span className='savings-label-sm'>Net savings rate</span>
                   <div
@@ -801,7 +768,6 @@ const MyFinancesPage = () => {
                 </div>
               </div>
 
-              {/* Widget Skor Kesehatan (Lingkaran) */}
               <div className='dash-card dark health-score-card'>
                 <h3 className='dash-card-title text-white w-full text-left mb-6'>
                   Health score
@@ -831,7 +797,6 @@ const MyFinancesPage = () => {
                   </div>
                 </div>
                 <div className='health-status-text'>{healthStatus}</div>
-
                 <div className='health-metrics-row'>
                   <div className='health-metric-mini'>
                     <span
@@ -865,7 +830,6 @@ const MyFinancesPage = () => {
             </div>
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-              {/* Daftar Target Finansial */}
               <div className='dash-card dark flex-1'>
                 <div
                   className='dash-card-header items-center'
@@ -887,22 +851,19 @@ const MyFinancesPage = () => {
                     Set Up Targets
                   </button>
                 </div>
-
                 {(financialData.financialTargets || []).map((target) => {
                   let targetAmount =
                     target.targetAmount || target.target_amount || 0;
                   let savedAmount =
                     target.saved || target.current_progress || 0;
-
                   if (target.isDefault) {
                     if (target.id === 'emergency') {
                       targetAmount = expVal * 6;
                       savedAmount = emergVal;
                     } else {
-                      savedAmount = parsedNetWorth;
+                      savedAmount = dynamicNetWorth;
                     }
                   }
-
                   const progress =
                     targetAmount > 0
                       ? Math.min(
@@ -910,7 +871,6 @@ const MyFinancesPage = () => {
                           Math.round((savedAmount / targetAmount) * 100),
                         )
                       : 0;
-
                   return (
                     <div
                       key={target.id || target.name}
@@ -920,14 +880,12 @@ const MyFinancesPage = () => {
                         <button
                           onClick={() => handleEditTarget(target)}
                           className='text-slate-400 hover:text-sky-400 bg-transparent border-none cursor-pointer p-0'
-                          title='Edit target'
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => deleteFinancialTarget(target.id)}
                           className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-0'
-                          title='Delete target'
                         >
                           <Trash2 size={14} />
                         </button>
@@ -962,15 +920,8 @@ const MyFinancesPage = () => {
                     </div>
                   );
                 })}
-                {(!financialData.financialTargets ||
-                  financialData.financialTargets.length === 0) && (
-                  <div className='text-center text-slate-500 py-4 text-sm'>
-                    Belum ada target keuangan yang disetel.
-                  </div>
-                )}
               </div>
 
-              {/* Kotak Wawasan Konsultan AI */}
               <div
                 className='dash-card flex-1'
                 style={{
@@ -991,14 +942,12 @@ const MyFinancesPage = () => {
                 <p className='text-sm text-slate-800 leading-relaxed'>
                   Your emergency fund is currently at{' '}
                   {(emergVal / (expVal > 0 ? expVal : 1)).toFixed(1)} months'
-                  worth of expenses. The ideal standard target is 6 months,
-                  which requires a total of Rp{' '}
-                  {emergencyTarget.toLocaleString('id-ID')}.
+                  worth of expenses.
                   {savingsRate < 40
-                    ? ' Try allocating an additional 15% of your income to accelerate this goal.'
-                    : ' Excellent savings rate! You are in a secure position to gradually DCA into other assets.'}
+                    ? ' Try allocating an additional 15% of your income.'
+                    : ' Excellent savings rate!'}
                   {debtRatio > 30
-                    ? ' Caution: Your debt ratio is high - prioritize paying off debt first.'
+                    ? ' Caution: Your debt ratio is high.'
                     : ' Your debt ratio is within safe parameters.'}
                 </p>
               </div>
@@ -1017,17 +966,12 @@ const MyFinancesPage = () => {
           </div>
         ) : (
           <div className='assets-grid animate-fade-in'>
-            {/* Baris Atas: Visualisasi Donut Chart */}
             <div className='dash-card'>
               <div className='dash-card-header'>
                 <div>
                   <h3 className='dash-card-title'>Asset Breakdown</h3>
-                  <p className='dash-card-subtitle'>
-                    Overview of assets in your portfolio
-                  </p>
                 </div>
               </div>
-
               {isLoadingAssets ? (
                 <SkeletonLoader type='pie' />
               ) : (
@@ -1060,7 +1004,6 @@ const MyFinancesPage = () => {
                       </span>
                     </div>
                   </div>
-
                   <div className='flex-1 w-full max-w-[200px] donut-legend'>
                     {pieData.map((item, idx) => (
                       <div key={idx} className='donut-legend-item'>
@@ -1093,36 +1036,16 @@ const MyFinancesPage = () => {
                     <div className='risk-metric-box'>
                       <span className='risk-metric-title'>Overall risk</span>
                       <span className='risk-metric-value text-yellow-500'>
-                        {riskMetrics?.overall_risk || 'Medium'}
-                      </span>
-                      <span className='risk-metric-sub'>
-                        Volatility index:{' '}
-                        {riskMetrics?.volatility_index || '0.38'}
+                        Medium
                       </span>
                     </div>
                     <div className='risk-metric-box'>
                       <span className='risk-metric-title'>Sharpe ratio</span>
                       <span className='risk-metric-value text-green-500'>
-                        {riskMetrics?.sharpe_ratio || '1.14'}
+                        1.14
                       </span>
-                      <span className='risk-metric-sub'>Above benchmark</span>
-                    </div>
-                    <div className='risk-metric-box'>
-                      <span className='risk-metric-title'>Max drawdown</span>
-                      <span className='risk-metric-value text-red-500'>
-                        {riskMetrics?.max_drawdown || '-6.2'}%
-                      </span>
-                      <span className='risk-metric-sub'>Last 12 months</span>
-                    </div>
-                    <div className='risk-metric-box'>
-                      <span className='risk-metric-title'>Beta</span>
-                      <span className='risk-metric-value text-white'>
-                        {riskMetrics?.beta || '0.82'}
-                      </span>
-                      <span className='risk-metric-sub'>vs IHSG</span>
                     </div>
                   </div>
-
                   <div className='mt-2'>
                     <span className='text-xs text-slate-400'>
                       Allocation vs ideal target
@@ -1144,7 +1067,6 @@ const MyFinancesPage = () => {
               )}
             </div>
 
-            {/* Tabel Detail Aset */}
             <div className='dash-card' style={{ gridColumn: '1 / -1' }}>
               <div
                 className='dash-card-header items-center'
@@ -1216,13 +1138,7 @@ const MyFinancesPage = () => {
                             </td>
                             <td>
                               <span
-                                className={`px-3 py-1 rounded-full text-[0.7rem] font-semibold ${
-                                  row.performance === 'Outperform'
-                                    ? 'bg-green-100 text-green-700'
-                                    : row.performance === 'In Line'
-                                      ? 'bg-yellow-100 text-yellow-700'
-                                      : 'bg-red-100 text-red-700'
-                                }`}
+                                className={`px-3 py-1 rounded-full text-[0.7rem] font-semibold ${row.performance === 'Outperform' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
                               >
                                 {row.performance}
                               </span>
@@ -1242,10 +1158,8 @@ const MyFinancesPage = () => {
                             </td>
                             <td style={{ textAlign: 'right' }}>
                               <button
-                                onClick={() =>
-                                  deleteAssetCategory(row.asset_category)
-                                }
-                                className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 flex items-center justify-center transition-colors inline-block'
+                                onClick={() => handleDeleteAssetBackend(row)}
+                                className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 transition-colors inline-block'
                                 title='Delete Category'
                               >
                                 <Trash2 size={14} />
@@ -1262,370 +1176,31 @@ const MyFinancesPage = () => {
           </div>
         ))}
 
-      {/* Modal Penambahan Aset */}
       <Modal
         isOpen={isAssetModalOpen}
         onClose={() => setIsAssetModalOpen(false)}
         title='Add Asset Category'
         className='large-top-modal'
       >
-        <div className='space-y-4 text-left'>
-          <div className='bg-indigo-50 border border-indigo-200 text-indigo-800 p-3 rounded-lg text-xs'>
-            <strong className='text-indigo-900 block mb-1'>
-              AI Asset Idea:
-            </strong>
-            Need ideas for portfolio diversification? You can add:
-            <ul className='list-disc pl-4 mt-1 space-y-1'>
-              <li>
-                <strong>Mutual Funds</strong>: (Stable growth, YTD Return ~6-8%,
-                Performance: "In Line")
-              </li>
-              <li>
-                <strong>Cryptocurrency</strong>: (High risk & volatility, YTD
-                Return ~35-50%, Performance: "Outperform")
-              </li>
-              <li>
-                <strong>Real Estate</strong>: (Tangible property value, YTD
-                Return ~4-6%, Performance: "In Line")
-              </li>
-            </ul>
-          </div>
-          <div className='flex flex-wrap gap-2 mb-2'>
-            <span className='text-xs text-slate-500 w-full font-medium'>
-              Or choose a template:
-            </span>
-            <button
-              type='button'
-              onClick={() => {
-                setNewAssetCategory('Cryptocurrency');
-                setNewAssetValue('20.000.000');
-                setNewAssetReturn('45.0');
-                setNewAssetPerf('Outperform');
-              }}
-              className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-            >
-              Crypto Template
-            </button>
-            <button
-              type='button'
-              onClick={() => {
-                setNewAssetCategory('Mutual Funds');
-                setNewAssetValue('15.000.000');
-                setNewAssetReturn('7.5');
-                setNewAssetPerf('In Line');
-              }}
-              className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-            >
-              Mutual Funds Template
-            </button>
-            <button
-              type='button'
-              onClick={() => {
-                setNewAssetCategory('Real Estate');
-                setNewAssetValue('150.000.000');
-                setNewAssetReturn('5.0');
-                setNewAssetPerf('In Line');
-              }}
-              className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-            >
-              Real Estate Template
-            </button>
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newAssetCategory'>
-              Category Name
-            </label>
-            <input
-              id='newAssetCategory'
-              type='text'
-              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
-              placeholder='e.g. Cryptocurrency'
-              style={{ color: '#0f172a' }}
-              value={newAssetCategory}
-              onChange={(e) => setNewAssetCategory(e.target.value)}
-            />
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newAssetValue'>
-              Current Value (Rp)
-            </label>
-            <div className='form-input-wrapper'>
-              <span className='form-prefix'>Rp</span>
-              <input
-                id='newAssetValue'
-                type='text'
-                className='form-input'
-                placeholder='e.g. 10.000.000'
-                value={newAssetValue}
-                onChange={(e) =>
-                  handleNumericChange(e.target.value, setNewAssetValue)
-                }
-              />
-            </div>
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newAssetReturn'>
-              YTD Return (%)
-            </label>
-            <input
-              id='newAssetReturn'
-              type='number'
-              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
-              placeholder='e.g. 12.5'
-              step='0.1'
-              style={{ color: '#0f172a' }}
-              value={newAssetReturn}
-              onChange={(e) => setNewAssetReturn(e.target.value)}
-            />
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newAssetPerf'>
-              Performance Status
-            </label>
-            <select
-              id='newAssetPerf'
-              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
-              style={{ color: '#0f172a', appearance: 'auto' }}
-              value={newAssetPerf}
-              onChange={(e) => setNewAssetPerf(e.target.value)}
-            >
-              <option value='Outperform'>Outperform</option>
-              <option value='In Line'>In Line</option>
-              <option value='Underperform'>Underperform</option>
-            </select>
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newAssetDate'>
-              Date / Tanggal
-            </label>
-            <input
-              id='newAssetDate'
-              type='date'
-              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
-              style={{ color: '#0f172a' }}
-              value={newAssetDate}
-              onChange={(e) => setNewAssetDate(e.target.value)}
-              onClick={(e) => {
-                try {
-                  e.target.showPicker();
-                } catch {
-                  // Fallback jika API browser tidak mendukung showPicker()
-                }
-              }}
-            />
-          </div>
-          <div className='flex justify-end gap-3 pt-4 border-t border-slate-100'>
-            <button
-              onClick={() => setIsAssetModalOpen(false)}
-              className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold'
-              style={{ background: 'none', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveNewAsset}
-              className='px-4 py-2 rounded-lg text-white font-semibold'
-              style={{
-                backgroundColor: '#0ea5e9',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Save Asset
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Modal Konfigurasi (Tambah & Edit) Target Keuangan */}
-      <Modal
-        isOpen={isTargetModalOpen}
-        onClose={() => setIsTargetModalOpen(false)}
-        title={
-          editingTargetId
-            ? 'Edit Financial Target'
-            : 'Configure Financial Targets'
-        }
-        className='large-top-modal'
-      >
-        <div className='space-y-4 text-left'>
-          {!editingTargetId && (
-            <>
-              <div className='bg-cyan-50 border border-cyan-200 text-cyan-800 p-3 rounded-lg text-xs'>
-                <strong className='text-cyan-900 block mb-1'>
-                  AI Target Recommendation:
-                </strong>
-                Based on your monthly surplus of{' '}
-                <strong>Rp {netSavings.toLocaleString('id-ID')}</strong>:
-                <ul className='list-disc pl-4 mt-1 space-y-1'>
-                  <li>
-                    An Emergency Fund of{' '}
-                    <strong>Rp {(expVal * 6).toLocaleString('id-ID')}</strong>{' '}
-                    (6x expenses) is recommended and can be achieved in{' '}
-                    <strong>
-                      {netSavings > 0
-                        ? Math.ceil((expVal * 6 - emergVal) / netSavings)
-                        : ' '}{' '}
-                      months
-                    </strong>
-                    .
-                  </li>
-                  <li>
-                    A custom Rp 150M property purchase goal will take{' '}
-                    <strong>
-                      {netSavings > 0 ? Math.ceil(150000000 / netSavings) : ' '}{' '}
-                      months
-                    </strong>{' '}
-                    of surplus accumulation.
-                  </li>
-                </ul>
-              </div>
-              <div className='flex flex-wrap gap-2 mb-2'>
-                <span className='text-xs text-slate-500 w-full font-medium'>
-                  Or choose a template:
-                </span>
-                <button
-                  type='button'
-                  onClick={() => {
-                    setNewTargetName('Down Payment for House');
-                    setNewTargetAmount('150.000.000');
-                    setNewTargetSaved('15.000.000');
-                    setNewTargetDeadline('');
-                  }}
-                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-                >
-                  House DP Template
-                </button>
-                <button
-                  type='button'
-                  onClick={() => {
-                    setNewTargetName('Hajj / Pilgrimage');
-                    setNewTargetAmount('50.000.000');
-                    setNewTargetSaved('5.000.000');
-                    setNewTargetDeadline('');
-                  }}
-                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-                >
-                  Pilgrimage Template
-                </button>
-                <button
-                  type='button'
-                  onClick={() => {
-                    setNewTargetName('New Car');
-                    setNewTargetAmount('250.000.000');
-                    setNewTargetSaved('20.000.000');
-                    setNewTargetDeadline('');
-                  }}
-                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-                >
-                  New Car Template
-                </button>
-                <button
-                  type='button'
-                  onClick={() => {
-                    setNewTargetName('Emergency Fund (Extra)');
-                    setNewTargetAmount((expVal * 12).toLocaleString('id-ID'));
-                    setNewTargetSaved(emergVal.toLocaleString('id-ID'));
-                    setNewTargetDeadline('');
-                  }}
-                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
-                >
-                  12x Expenses Template
-                </button>
-              </div>
-            </>
-          )}
-
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newTargetName'>
-              Target Goal Name
-            </label>
-            <input
-              id='newTargetName'
-              type='text'
-              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
-              placeholder='e.g. Marriage or Education Fund'
-              style={{ color: '#0f172a' }}
-              value={newTargetName}
-              onChange={(e) => setNewTargetName(e.target.value)}
-            />
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newTargetAmount'>
-              Target Amount (Rp)
-            </label>
-            <div className='form-input-wrapper'>
-              <span className='form-prefix'>Rp</span>
-              <input
-                id='newTargetAmount'
-                type='text'
-                className='form-input'
-                placeholder='e.g. 50.000.000'
-                value={newTargetAmount}
-                onChange={(e) =>
-                  handleNumericChange(e.target.value, setNewTargetAmount)
-                }
-              />
-            </div>
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newTargetSaved'>
-              Current Savings (Rp)
-            </label>
-            <div className='form-input-wrapper'>
-              <span className='form-prefix'>Rp</span>
-              <input
-                id='newTargetSaved'
-                type='text'
-                className='form-input'
-                placeholder='e.g. 5.000.000'
-                value={newTargetSaved}
-                onChange={(e) =>
-                  handleNumericChange(e.target.value, setNewTargetSaved)
-                }
-              />
-            </div>
-          </div>
-          <div className='form-group'>
-            <label className='form-label' htmlFor='newTargetDeadline'>
-              Deadline / Timeframe
-            </label>
-            <input
-              id='newTargetDeadline'
-              type='date'
-              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
-              style={{ color: '#0f172a' }}
-              value={newTargetDeadline}
-              onChange={(e) => setNewTargetDeadline(e.target.value)}
-              onClick={(e) => {
-                try {
-                  e.target.showPicker();
-                } catch {
-                  // Fallback jika API browser tidak mendukung showPicker()
-                }
-              }}
-            />
-          </div>
-          <div className='flex justify-end gap-3 pt-4 border-t border-slate-100'>
-            <button
-              onClick={() => setIsTargetModalOpen(false)}
-              className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold'
-              style={{ background: 'none', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveTarget}
-              className='px-4 py-2 rounded-lg text-white font-semibold'
-              style={{
-                backgroundColor: '#0ea5e9',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              {editingTargetId ? 'Update Goal' : 'Save Goal'}
-            </button>
-          </div>
+        <div className='flex justify-end gap-3 pt-4 border-t border-slate-100'>
+          <button
+            onClick={() => setIsAssetModalOpen(false)}
+            className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold'
+            style={{ background: 'none', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveNewAsset}
+            className='px-4 py-2 rounded-lg text-white font-semibold'
+            style={{
+              backgroundColor: '#0ea5e9',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Save Asset
+          </button>
         </div>
       </Modal>
     </div>
