@@ -157,7 +157,7 @@ const MyFinancesPage = () => {
   };
 
   // ==============================================================================
-  // FIX: Pemisahan totalDebtVal dan monthlyDebtPaymentVal untuk sinkronisasi skor
+  // Pemisahan totalDebtVal dan monthlyDebtPaymentVal untuk keperluan skor lainnya
   // ==============================================================================
   const incVal = parseCleanNum(monthlyIncome);
   const expVal = parseCleanNum(monthlyExpenses);
@@ -169,7 +169,7 @@ const MyFinancesPage = () => {
   const netSavings = incVal - expVal;
   const savingsRate = incVal > 0 ? (netSavings / incVal) * 100 : 0;
 
-  // Hitung rasio utang murni menggunakan cicilan per bulan (DTI) agar skor tidak nyungsep
+  // Menghitung rasio hutang murni menggunakan cicilan per bulan (DTI)
   const debtRatio = incVal > 0 ? (monthlyDebtPaymentVal / incVal) * 100 : 0;
 
   const emergencyTarget = expVal * 6;
@@ -180,7 +180,7 @@ const MyFinancesPage = () => {
   );
 
   const baseAssets = totalAssetsSum > 0 ? totalAssetsSum : emergVal;
-  // Kalkulasi Net Worth murni dikurangi total sisa utang keseluruhan
+  // Kalkulasi kekayaan bersih murni dikurangi total sisa hutang keseluruhan
   const dynamicNetWorth = baseAssets - totalDebtVal;
   const parsedNetWorth = dynamicNetWorth;
 
@@ -245,14 +245,10 @@ const MyFinancesPage = () => {
     return dateB - dateA;
   });
 
-  // Sinkronisasi logika kalkulasi real-time persis seperti di backend portfolio.js
-  const healthScore = Math.round(
-    Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
-  );
-
-  let healthStatusText = 'Needs improvement';
-  if (healthScore >= 70) healthStatusText = 'Good - on track';
-  else if (healthScore >= 50) healthStatusText = 'Fair - needs attention';
+  // Mengambil skor kesehatan (health score) langsung dari data backend (Context)
+  // untuk memastikan sinkronisasi data antar halaman.
+  const healthScore = financialData.healthScore || 0;
+  const healthStatusText = financialData.healthStatus || 'Needs improvement';
 
   const handleSubmitProfile = async () => {
     setIsSubmitting(true);
@@ -270,6 +266,22 @@ const MyFinancesPage = () => {
 
       await api.saveProfile(payload);
 
+      // Mengambil ulang data profil, aset, dan arus kas untuk memperbarui metrik secara real-time
+      const [assetsRes, cashflowRes, profileRes] = await Promise.all([
+        api.getAssets(),
+        api.getCashflow(),
+        api.getProfile(),
+      ]);
+
+      // Menangkap skor kesehatan terbaru dari respons backend
+      let newHealthScore = financialData.healthScore;
+      let newHealthStatus = financialData.healthStatus;
+
+      if (profileRes && profileRes.success && profileRes.metrics) {
+        newHealthScore = profileRes.metrics.health_score;
+        newHealthStatus = profileRes.metrics.health_status;
+      }
+
       updateFinancialData({
         monthlyIncome,
         monthlyExpenses,
@@ -278,12 +290,9 @@ const MyFinancesPage = () => {
         monthlyDebtPayment,
         netWorth: dynamicNetWorth.toString(),
         isProfileCompleted: true,
+        healthScore: newHealthScore,
+        healthStatus: newHealthStatus,
       });
-
-      const [assetsRes, cashflowRes] = await Promise.all([
-        api.getAssets(),
-        api.getCashflow(),
-      ]);
 
       if (assetsRes && assetsRes.success)
         setRiskMetrics(assetsRes.risk_metrics);
