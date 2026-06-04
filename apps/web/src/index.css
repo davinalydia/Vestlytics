@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+/* Premium Buttons CSS */
+.btn-primary-premium, .btn-secondary-premium, .btn-nav-premium {
+  transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.btn-primary-premium:hover {
+  transform: scale(1.05);
+  background-color: #4f46e5;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4), 0 8px 10px -6px rgba(99, 102, 241, 0.1);
+}
+
+.btn-secondary-premium:hover {
+  transform: scale(1.05);
+  background-color: rgba(30, 41, 59, 0.5);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.4);
+}
+
+.btn-nav-premium:hover {
+  transform: scale(1.05);
+  background-color: #4f46e5;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+}
+
+/* Nav Links Underline Animation */
+.nav-link-animated {
+  position: relative;
+  transition: color 0.3s ease-in-out;
+}
+
+.nav-link-animated::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: -4px;
+  left: 0;
+  background-color: #ffffff;
+  transition: width 0.3s ease-in-out;
+}
+
+.nav-link-animated:hover::after {
+  width: 100%;
+}
+
+.nav-link-animated:hover {
+  color: #ffffff;
+}
+
+/* Page fade-in keyframe (fallback for non-Framer pages) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* ============================================================
+   GLOBAL MINIMUM FONT SIZE (MIN 14PX) ENFORCEMENT
+   ============================================================ */
+body, html, input, button, select, textarea {
+  font-size: 14px;
+}
+
+/* Target and upgrade all selectors/classes configured with < 14px font-size */
+.text-xs,
+.text-2xs,
+.text-\[10px\],
+.text-\[11px\],
+.text-\[12px\],
+.text-\[13px\],
+.text-\[0\.7rem\],
+.text-\[0\.75rem\],
+.text-\[0\.8rem\],
+.text-\[0\.85rem\],
+small,
+.ai-page-subtitle,
+.ai-score-badge,
+.ai-score-sub,
+.asset-mini-row,
+.log-badge,
+.log-category,
+.log-desc,
+.log-time,
+.mini-health-label,
+.mini-status-badge,
+.net-savings-label,
+.sidebar-title,
+.ai-insight-box,
+.dash-badge-outline,
+.dash-card-subtitle,
+.dash-table,
+.donut-legend,
+.health-badge,
+.health-label,
+.metric-label,
+.metric-sub,
+.savings-label-sm,
+.help-contact-desc,
+.help-contact-link,
+.page-subtitle,
+.sidebar-footer,
+.sidebar-label,
+.metric-change,
+.metric-title,
+.news-meta,
+.news-sentiment,
+.stock-card-change,
+.stock-card-price,
+.asset-cat-name,
+.asset-cat-pct,
+.circular-score-sub,
+.dark-table,
+.form-label,
+.health-metric-label,
+.health-metric-val,
+.health-status-text,
+.risk-metric-sub,
+.risk-metric-title,
+.submit-btn,
+.target-badge,
+.target-footer,
+.target-title,
+.change-photo-btn,
+.profile-email,
+.settings-card-subtitle,
+.settings-label,
+.settings-sidebar-label,
+.toggle-desc,
+.chart-placeholder-text,
+.insight-metric-label,
+.insight-text,
+.insight-verdict-badge,
+.sc-rate-label,
+.sc-title,
+.sc-val,
+.scc-legend-item,
+.scc-title-badge,
+.smc-sub,
+.smc-title,
+.strategy-form-label,
+.strategy-input-prefix,
+.strategy-input-suffix,
+.strategy-input-wrapper.compact .strategy-input,
+.strategy-input-wrapper.compact .strategy-input-prefix,
+.strategy-sidebar-title,
+.strategy-tooltip-label,
+.strategy-tooltip-name,
+.strategy-tooltip-val,
+.modal-close-btn,
+.strategy-info-btn,
+.header-info-btn,
+.sidebar-brand-text,
+.sidebar-link-text {
+  font-size: 14px !important;
+}

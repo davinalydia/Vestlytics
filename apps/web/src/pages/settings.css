@@ -1,0 +1,276 @@
+/* Settings Layout */
+.settings-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  max-width: 1000px;
+  position: relative;
+  z-index: 10;
+}
+
+@media (min-width: 768px) {
+  .settings-container {
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+/* Settings Sidebar */
+.settings-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-sidebar-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.75rem;
+  padding-left: 0.75rem;
+}
+
+.settings-tab {
+  padding: 0.75rem;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.settings-tab:hover {
+  background-color: rgba(241, 245, 249, 0.5);
+  color: #0f172a;
+}
+
+.settings-tab.active {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+/* Settings Content Panel */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settings-card {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.settings-card-header {
+  margin-bottom: 1.5rem;
+}
+
+.settings-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+
+.settings-card-subtitle {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* Form Styles */
+.profile-photo-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.profile-avatar svg {
+  width: 48px;
+  height: 48px;
+  color: #94a3b8;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.profile-email {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.change-photo-btn {
+  font-size: 0.8rem;
+  color: #0ea5e9;
+  background-color: #e0f2fe;
+  border: 1px solid #bae6fd;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  width: max-content;
+}
+
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .settings-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.settings-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.settings-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.settings-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background-color: #f8fafc;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.settings-input:focus {
+  border-color: #0ea5e9;
+  background-color: white;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.btn-save {
+  background-color: #4396b5;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-save:hover {
+  background-color: #3b829c;
+}
+
+.btn-cancel {
+  background-color: transparent;
+  color: #64748b;
+  border: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  color: #0f172a;
+}
+
+/* Toggle Switches */
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.toggle-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggle-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.toggle-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: #4396b5;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch.off {
+  background-color: #cbd5e1;
+}
+
+.toggle-switch.off::after {
+  right: auto;
+  left: 2px;
+}

@@ -1,0 +1,102 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+
+.modal-container {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.modal-close-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.modal-content {
+  padding: 1.5rem;
+  overflow-y: auto;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.modal-content h3 {
+  color: #6B7A99;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.modal-content h3:first-child {
+  margin-top: 0;
+}
+
+.modal-content p {
+  margin-bottom: 1rem;
+}
+
+.modal-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Custom layout for Market Analysis stock selection modal */
+.large-top-modal-backdrop {
+  align-items: flex-start !important;
+  padding-top: 3rem !important;
+}
+
+.large-top-modal {
+  max-width: 900px !important;
+  width: 95% !important;
+  max-height: 85vh !important;
+}
+
