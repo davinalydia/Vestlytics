@@ -69,3 +69,6 @@ Buka terminal baru, pastikan Anda berada di root directory, lalu jalankan server
 Buka tab terminal satu lagi, lalu jalankan client frontend:
 `npm run dev:web`
 (Secara default, Frontend Vite akan berjalan di http://localhost:5173)
+
+## Alamat web deployment
+[Web Vestlytics](vestlytics-web.netlify.app)
