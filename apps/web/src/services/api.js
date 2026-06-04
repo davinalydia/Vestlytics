@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { supabase } from '../../config/supabase.js';
 
-const API_URL = 'https://vestlytics.onrender.com';
+const API_URL = 'https://vestlytics.onrender.com/api';
 
 // Membuat instance Axios untuk konfigurasi default secara global
 const apiClient = axios.create({
