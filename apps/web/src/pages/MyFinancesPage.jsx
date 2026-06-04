@@ -237,9 +237,9 @@ const MyFinancesPage = () => {
     return dateB - dateA;
   });
 
-  const healthScore = Math.round(
-    Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
-  );
+  // Mengambil healthScore dan status terpusat dari context global
+  const healthScore = financialData.healthScore || 0;
+  const healthStatus = financialData.healthStatus || 'Needs improvement';
 
   const handleSubmitProfile = async () => {
     setIsSubmitting(true);
@@ -258,8 +258,6 @@ const MyFinancesPage = () => {
       // 1. Menyimpan profil utama ke backend
       await api.saveProfile(payload);
 
-      // (Logika injeksi aset statis yang menyebakan error telah dibuang sepenuhnya)
-
       // 2. Memperbarui state global dan membuka status Onboarding
       updateFinancialData({
         monthlyIncome,
@@ -271,11 +269,20 @@ const MyFinancesPage = () => {
         isProfileCompleted: true,
       });
 
-      // 3. Melakukan sinkronisasi ulang data terbaru dari backend
-      const [assetsRes, cashflowRes] = await Promise.all([
+      // 3. Melakukan sinkronisasi ulang data terbaru dari backend termasuk profil untuk mengupdate healthScore
+      const [profileRes, assetsRes, cashflowRes] = await Promise.all([
+        api.getProfile(),
         api.getAssets(),
         api.getCashflow(),
       ]);
+
+      if (profileRes && profileRes.success) {
+        updateFinancialData({
+          healthScore: profileRes.metrics?.health_score || 0,
+          healthStatus:
+            profileRes.metrics?.health_status || 'Needs improvement',
+        });
+      }
 
       if (assetsRes && assetsRes.success)
         setRiskMetrics(assetsRes.risk_metrics);
@@ -823,9 +830,7 @@ const MyFinancesPage = () => {
                     <span className='circular-score-sub'>out of 100</span>
                   </div>
                 </div>
-                <div className='health-status-text'>
-                  {healthScore >= 70 ? 'Good - on track' : 'Needs improvement'}
-                </div>
+                <div className='health-status-text'>{healthStatus}</div>
 
                 <div className='health-metrics-row'>
                   <div className='health-metric-mini'>

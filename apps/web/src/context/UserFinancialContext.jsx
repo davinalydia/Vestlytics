@@ -16,6 +16,8 @@ export const UserFinancialProvider = ({ children }) => {
     isProfileCompleted: false,
     assetsList: [],
     financialTargets: [],
+    healthScore: 0,
+    healthStatus: 'Needs improvement',
   });
 
   const getInitialProfile = () => {
@@ -81,6 +83,7 @@ export const UserFinancialProvider = ({ children }) => {
 
           if (profileRes && profileRes.success && profileRes.profile_data) {
             const p = profileRes.profile_data;
+            const m = profileRes.metrics || {};
             const isCompleted = p.monthly_income > 0 && p.monthly_expenses > 0;
             updated = {
               ...updated,
@@ -90,6 +93,8 @@ export const UserFinancialProvider = ({ children }) => {
               totalDebt: p.total_debt || '',
               monthlyDebtPayment: p.monthly_debt_payment || '',
               isProfileCompleted: isCompleted,
+              healthScore: m.health_score || 0,
+              healthStatus: m.health_status || 'Needs improvement',
             };
           }
 

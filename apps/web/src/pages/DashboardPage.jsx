@@ -109,10 +109,9 @@ const DashboardPage = () => {
         })
       : [{ name: 'Belum ada aset', value: 100, color: '#334155' }];
 
-  // Skor kesehatan finansial dihitung secara dinamis dari rasio tabungan dan rasio utang
-  const healthScore = Math.round(
-    Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
-  );
+  // Mengambil healthScore dan status terpusat dari context global
+  const healthScore = financialData.healthScore || 0;
+  const healthStatus = financialData.healthStatus || 'Needs improvement';
 
   // Mengonversi data riwayat arus kas dari backend ke format grafik batang (Bar Chart)
   // Data dibalik (reverse) agar grafik menampilkan kronologi waktu dari kiri (terlama) ke kanan (terbaru)
@@ -167,7 +166,7 @@ const DashboardPage = () => {
             ) : (
               <>
                 <div className='metric-value'>{healthScore}/100</div>
-                <div className='metric-sub text-cyan'>Risk Match - Good</div>
+                <div className='metric-sub text-cyan'>{healthStatus}</div>
               </>
             )}
           </div>

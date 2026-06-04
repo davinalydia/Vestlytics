@@ -36,13 +36,26 @@ router.get('/profile', requireAuth, async (req, res) => {
       ? (netSavings / profile.monthly_income) * 100
       : 0;
 
+  const debtRatio =
+    profile.monthly_income > 0
+      ? (profile.total_debt / profile.monthly_income) * 100
+      : 0;
+  
+  const healthScore = Math.round(
+    Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
+  );
+
+  let healthStatus = 'Needs improvement';
+  if (healthScore >= 70) healthStatus = 'Good - on track';
+  else if (healthScore >= 50) healthStatus = 'Fair - needs attention';
+  
   res.json({
     success: true,
     profile_data: profile,
     metrics: {
       net_savings_rate: savingsRate.toFixed(1),
-      health_score: savingsRate > 20 ? 72 : 45,
-      health_status: 'Good - room to improve',
+      health_score: healthScore,
+      health_status: healthStatus,
     },
   });
 });
