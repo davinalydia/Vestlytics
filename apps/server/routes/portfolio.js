@@ -24,10 +24,12 @@ router.get('/profile', requireAuth, async (req, res) => {
       .json({ error: 'Gagal memuat profil keuangan pengguna.' });
   }
 
+  // Menambahkan fallback untuk monthly_debt_payment agar kalkulasi rasio hutang tidak bernilai undefined
   const profile = data || {
     monthly_income: 0,
     monthly_expenses: 0,
     total_debt: 0,
+    monthly_debt_payment: 0,
   };
 
   const netSavings = profile.monthly_income - profile.monthly_expenses;
@@ -36,11 +38,12 @@ router.get('/profile', requireAuth, async (req, res) => {
       ? (netSavings / profile.monthly_income) * 100
       : 0;
 
+  // Memperbaiki kalkulasi rasio hutang (DTI) dengan menggunakan cicilan bulanan (monthly_debt_payment)
   const debtRatio =
     profile.monthly_income > 0
-      ? (profile.total_debt / profile.monthly_income) * 100
+      ? (profile.monthly_debt_payment / profile.monthly_income) * 100
       : 0;
-  
+
   const healthScore = Math.round(
     Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
   );
@@ -48,7 +51,7 @@ router.get('/profile', requireAuth, async (req, res) => {
   let healthStatus = 'Needs improvement';
   if (healthScore >= 70) healthStatus = 'Good - on track';
   else if (healthScore >= 50) healthStatus = 'Fair - needs attention';
-  
+
   res.json({
     success: true,
     profile_data: profile,
@@ -181,12 +184,10 @@ router.delete('/cashflow/reset/all', requireAuth, async (req, res) => {
     .eq('user_id', userId);
 
   if (error) {
-    return res
-      .status(500)
-      .json({
-        error: 'Gagal mereset riwayat tabel arus kas.',
-        details: error.message,
-      });
+    return res.status(500).json({
+      error: 'Gagal mereset riwayat tabel arus kas.',
+      details: error.message,
+    });
   }
 
   res.json({
@@ -207,12 +208,10 @@ router.delete('/cashflow/:id', requireAuth, async (req, res) => {
     .eq('user_id', userId);
 
   if (error) {
-    return res
-      .status(500)
-      .json({
-        error: 'Gagal menghapus baris riwayat arus kas.',
-        details: error.message,
-      });
+    return res.status(500).json({
+      error: 'Gagal menghapus baris riwayat arus kas.',
+      details: error.message,
+    });
   }
 
   res.json({ success: true, message: 'Baris riwayat berhasil dihapus.' });
