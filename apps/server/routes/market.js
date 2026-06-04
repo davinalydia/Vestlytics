@@ -5,7 +5,8 @@ const router = express.Router();
 
 // Inisialisasi koneksi Supabase (Pastikan environment variables sudah di-set)
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY; 
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 1. ENDPOINT: GET DATA FEED SAHAM (Menyediakan data market umum, default: BBCA)
@@ -75,21 +76,20 @@ router.get('/analysis/:ticker', async (req, res) => {
   const ticker = req.params.ticker.toUpperCase();
 
   try {
-    // Mengambil seluruh riwayat harga berdasarkan ticker yang direquest
+    // Mengambil riwayat harga saham mulai dari tahun 2022 agar grafik lebih relevan dan tidak terlalu padat
     const { data, error } = await supabase
       .from('market_data')
       .select('Date, Close, Ticker')
       .ilike('Ticker', `${ticker}%`)
+      .gte('Date', '2022-01-01') // Menambahkan filter batas waktu dari 1 Januari 2022
       .order('Date', { ascending: true });
 
     if (error) throw error;
 
     if (!data || data.length === 0) {
-      return res
-        .status(404)
-        .json({
-          error: `Data historis untuk saham ${ticker} tidak ditemukan.`,
-        });
+      return res.status(404).json({
+        error: `Data historis untuk saham ${ticker} tidak ditemukan.`,
+      });
     }
 
     const chartData = data.map((row) => ({
@@ -129,7 +129,7 @@ router.get('/analysis/:ticker', async (req, res) => {
 // 4. ENDPOINT: GET DAFTAR SAHAM (Menyediakan list saham untuk fitur dropdown/pencarian di frontend)
 router.get('/available-stocks', async (req, res) => {
   try {
-    // Mengambil data dari SQL View 'unique_tickers' untuk menghindari limit row 
+    // Mengambil data dari SQL View 'unique_tickers' untuk menghindari limit row
     // dan menghasilkan query yang jauh lebih efisien dibandingkan query langsung ke tabel utama
     const { data, error } = await supabase
       .from('unique_tickers')
@@ -140,9 +140,11 @@ router.get('/available-stocks', async (req, res) => {
     // Menggunakan Map untuk memastikan tidak ada duplikasi data saham pada response
     const uniqueStocks = new Map();
 
-    data.forEach(row => {
+    data.forEach((row) => {
       // Menghilangkan format '.JK' agar nama emiten lebih bersih saat ditampilkan di UI
-      const cleanTicker = row.Ticker ? row.Ticker.replace('.JK', '').toUpperCase() : null;
+      const cleanTicker = row.Ticker
+        ? row.Ticker.replace('.JK', '').toUpperCase()
+        : null;
 
       if (cleanTicker && !uniqueStocks.has(cleanTicker)) {
         // Melakukan generate data simulasi (harga dan persentase) untuk kebutuhan visual dummy
