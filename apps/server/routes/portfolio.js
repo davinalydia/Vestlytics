@@ -43,6 +43,11 @@ router.get('/profile', requireAuth, async (req, res) => {
     profile.monthly_income > 0
       ? (profile.monthly_debt_payment / profile.monthly_income) * 100
       : 0;
+  
+  const emergRatio =
+    profile.monthly_expenses > 0
+      ? profile.emergency_fund / profile.monthly_expenses
+      : 0;
 
   const savingsScore = Math.min(35, savingsRate);
   const emergScore = Math.min(35, (emergRatio / 6) * 35);
