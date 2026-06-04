@@ -19,17 +19,9 @@ import './myFinances.css';
 import './dashboard.css';
 
 const MyFinancesPage = () => {
-  const {
-    financialData,
-    updateFinancialData,
-    addAssetCategory,
-    deleteAssetCategory,
-    addFinancialTarget,
-    updateFinancialTarget,
-    deleteFinancialTarget,
-    healthScore,
-    healthStatus,
-  } = useContext(UserFinancialContext);
+  // Hanya mengekstrak data yang dibutuhkan, operasi CRUD akan diarahkan ke API langsung
+  const { financialData, updateFinancialData, healthScore, healthStatus } =
+    useContext(UserFinancialContext);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'profile';
@@ -174,6 +166,7 @@ const MyFinancesPage = () => {
   );
   const dynamicNetWorth =
     (totalAssetsSum > 0 ? totalAssetsSum : emergVal) - debtVal;
+  const parsedNetWorth = dynamicNetWorth;
 
   const pieData =
     totalAssetsSum > 0
@@ -256,10 +249,19 @@ const MyFinancesPage = () => {
         isProfileCompleted: true,
       });
 
-      const [assetsRes, cashflowRes] = await Promise.all([
+      const [profileRes, assetsRes, cashflowRes] = await Promise.all([
+        api.getProfile(),
         api.getAssets(),
         api.getCashflow(),
       ]);
+
+      if (profileRes && profileRes.success) {
+        updateFinancialData({
+          healthScore: profileRes.metrics?.health_score || 0,
+          healthStatus:
+            profileRes.metrics?.health_status || 'Needs improvement',
+        });
+      }
 
       if (assetsRes && assetsRes.success)
         setRiskMetrics(assetsRes.risk_metrics);
@@ -290,7 +292,7 @@ const MyFinancesPage = () => {
   const handleResetCashflow = async () => {
     if (
       window.confirm(
-        'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas?',
+        'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas? Data tidak dapat dipulihkan.',
       )
     ) {
       try {
@@ -302,21 +304,29 @@ const MyFinancesPage = () => {
     }
   };
 
-  // FUNGSI FIXED: Menghapus data dari Backend secara penuh dan menyinkronkannya dengan UI
+  // ==========================================
+  // MANAJEMEN ASET
+  // ==========================================
+
+  // FUNGSI FIXED: Menghapus data dari Backend dan memperbarui UI dengan data asli dari database
   const handleDeleteAssetBackend = async (assetRow) => {
     try {
       if (assetRow.id) {
-        // Melakukan request hapus ke server backend
         await api.deleteAsset(assetRow.id);
       }
-      // Memperbarui state Context global agar aset hilang dari UI
-      deleteAssetCategory(assetRow.asset_category);
+      // Memaksa penarikan data terbaru dari database agar ID selalu tersinkronisasi
+      const assetsRes = await api.getAssets();
+      if (assetsRes && assetsRes.success) {
+        updateFinancialData({ assetsList: assetsRes.assets || [] });
+        setRiskMetrics(assetsRes.risk_metrics);
+      }
     } catch (error) {
       console.error('Gagal menghapus aset secara penuh dari backend:', error);
     }
   };
 
-  const handleSaveNewAsset = () => {
+  // FUNGSI FIXED: Menyimpan aset ke Backend dan langsung menarik ID yang valid
+  const handleSaveNewAsset = async () => {
     if (!newAssetCategory || !newAssetValue) return;
 
     const newAsset = {
@@ -329,8 +339,18 @@ const MyFinancesPage = () => {
         : new Date().toISOString(),
     };
 
-    api.saveAsset(newAsset).catch(console.error);
-    addAssetCategory(newAsset);
+    try {
+      await api.saveAsset(newAsset);
+
+      // Mengambil ulang daftar aset dari database agar aset baru memiliki ID asli (UUID)
+      const assetsRes = await api.getAssets();
+      if (assetsRes && assetsRes.success) {
+        updateFinancialData({ assetsList: assetsRes.assets || [] });
+        setRiskMetrics(assetsRes.risk_metrics);
+      }
+    } catch (error) {
+      console.error('Gagal menyimpan aset ke backend:', error);
+    }
 
     setIsAssetModalOpen(false);
     setNewAssetCategory('');
@@ -339,6 +359,10 @@ const MyFinancesPage = () => {
     setNewAssetPerf('In Line');
     setNewAssetDate(new Date().toISOString().split('T')[0]);
   };
+
+  // ==========================================
+  // MANAJEMEN TARGET KEUANGAN
+  // ==========================================
 
   const handleOpenAddTarget = () => {
     setEditingTargetId(null);
@@ -353,26 +377,47 @@ const MyFinancesPage = () => {
     setEditingTargetId(target.id);
     setNewTargetName(target.name || target.target_name || '');
     setNewTargetAmount(
-      target.targetAmount ? target.targetAmount.toLocaleString('id-ID') : '',
+      target.targetAmount
+        ? target.targetAmount.toLocaleString('id-ID')
+        : target.target_amount
+          ? target.target_amount.toLocaleString('id-ID')
+          : '',
     );
-    setNewTargetSaved(target.saved ? target.saved.toLocaleString('id-ID') : '');
+    setNewTargetSaved(
+      target.saved
+        ? target.saved.toLocaleString('id-ID')
+        : target.current_progress
+          ? target.current_progress.toLocaleString('id-ID')
+          : '',
+    );
     setNewTargetDeadline(target.deadline || '');
     setIsTargetModalOpen(true);
   };
 
-  const handleSaveTarget = () => {
+  // FUNGSI FIXED: Menyimpan target keuangan langsung ke backend
+  const handleSaveTarget = async () => {
     if (!newTargetName || !newTargetAmount) return;
 
-    const targetData = {
-      name: newTargetName,
-      targetAmount: parseCleanNum(newTargetAmount),
-      saved: parseCleanNum(newTargetSaved),
-      deadline: newTargetDeadline,
-      isDefault: false,
+    const payload = {
+      target_name: newTargetName,
+      target_amount: parseCleanNum(newTargetAmount),
+      current_progress: parseCleanNum(newTargetSaved),
     };
 
-    if (editingTargetId) updateFinancialTarget(editingTargetId, targetData);
-    else addFinancialTarget(targetData);
+    try {
+      if (editingTargetId) {
+        await api.updateTarget(editingTargetId, payload);
+      } else {
+        await api.saveTarget(payload);
+      }
+
+      const targetsRes = await api.getTargets();
+      if (targetsRes && targetsRes.success) {
+        updateFinancialData({ financialTargets: targetsRes.targets || [] });
+      }
+    } catch (error) {
+      console.error('Gagal menyimpan target ke backend:', error);
+    }
 
     setIsTargetModalOpen(false);
     setEditingTargetId(null);
@@ -380,6 +425,21 @@ const MyFinancesPage = () => {
     setNewTargetAmount('');
     setNewTargetSaved('');
     setNewTargetDeadline('');
+  };
+
+  // FUNGSI FIXED: Menghapus target keuangan secara permanen dari backend
+  const handleDeleteTargetBackend = async (targetId) => {
+    try {
+      if (targetId) {
+        await api.deleteTarget(targetId);
+      }
+      const targetsRes = await api.getTargets();
+      if (targetsRes && targetsRes.success) {
+        updateFinancialData({ financialTargets: targetsRes.targets || [] });
+      }
+    } catch (error) {
+      console.error('Gagal menghapus target dari backend:', error);
+    }
   };
 
   return (
@@ -861,7 +921,7 @@ const MyFinancesPage = () => {
                       targetAmount = expVal * 6;
                       savedAmount = emergVal;
                     } else {
-                      savedAmount = dynamicNetWorth;
+                      savedAmount = parsedNetWorth;
                     }
                   }
                   const progress =
@@ -883,8 +943,9 @@ const MyFinancesPage = () => {
                         >
                           <Edit2 size={14} />
                         </button>
+                        {/* Memanggil fungsi hapus ke backend yang baru dibuat */}
                         <button
-                          onClick={() => deleteFinancialTarget(target.id)}
+                          onClick={() => handleDeleteTargetBackend(target.id)}
                           className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-0'
                         >
                           <Trash2 size={14} />
@@ -1157,9 +1218,10 @@ const MyFinancesPage = () => {
                                 : '--'}
                             </td>
                             <td style={{ textAlign: 'right' }}>
+                              {/* Menggunakan fungsi penghapusan backend yang baru */}
                               <button
                                 onClick={() => handleDeleteAssetBackend(row)}
-                                className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 transition-colors inline-block'
+                                className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 flex items-center justify-center transition-colors inline-block'
                                 title='Delete Category'
                               >
                                 <Trash2 size={14} />
