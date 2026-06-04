@@ -6,6 +6,7 @@ import {
   Loader2,
   Check,
   Trash2,
+  X,
   Edit2,
   RotateCcw,
 } from 'lucide-react';
@@ -19,7 +20,6 @@ import './myFinances.css';
 import './dashboard.css';
 
 const MyFinancesPage = () => {
-  // Hanya mengekstrak data yang dibutuhkan, operasi CRUD akan diarahkan ke API langsung
   const {
     financialData,
     updateFinancialData,
@@ -28,8 +28,6 @@ const MyFinancesPage = () => {
     addFinancialTarget,
     updateFinancialTarget,
     deleteFinancialTarget,
-    healthScore,
-    healthStatus,
   } = useContext(UserFinancialContext);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,8 +171,9 @@ const MyFinancesPage = () => {
     (sum, item) => sum + parseFloat(item.value || 0),
     0,
   );
-  const dynamicNetWorth =
-    (totalAssetsSum > 0 ? totalAssetsSum : emergVal) - debtVal;
+
+  const baseAssets = totalAssetsSum > 0 ? totalAssetsSum : emergVal;
+  const dynamicNetWorth = baseAssets - debtVal;
   const parsedNetWorth = dynamicNetWorth;
 
   const pieData =
@@ -214,7 +213,11 @@ const MyFinancesPage = () => {
       year: 'numeric',
     });
 
-    if (!cashflowListToUse.some((c) => c.month_period === formattedMonth)) {
+    const isAlreadyExists = cashflowListToUse.some(
+      (c) => c.month_period === formattedMonth,
+    );
+
+    if (!isAlreadyExists) {
       cashflowListToUse.push({
         id: 'draft-id',
         month_period: `${formattedMonth} (Draft)`,
@@ -229,8 +232,14 @@ const MyFinancesPage = () => {
   const sortedCashflow = cashflowListToUse.sort((a, b) => {
     if (a.month_period.includes('(Draft)')) return -1;
     if (b.month_period.includes('(Draft)')) return 1;
-    return new Date(b.month_period) - new Date(a.month_period);
+    const dateA = new Date(a.month_period);
+    const dateB = new Date(b.month_period);
+    return dateB - dateA;
   });
+
+  const healthScore = Math.round(
+    Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
+  );
 
   const handleSubmitProfile = async () => {
     setIsSubmitting(true);
@@ -258,19 +267,10 @@ const MyFinancesPage = () => {
         isProfileCompleted: true,
       });
 
-      const [profileRes, assetsRes, cashflowRes] = await Promise.all([
-        api.getProfile(),
+      const [assetsRes, cashflowRes] = await Promise.all([
         api.getAssets(),
         api.getCashflow(),
       ]);
-
-      if (profileRes && profileRes.success) {
-        updateFinancialData({
-          healthScore: profileRes.metrics?.health_score || 0,
-          healthStatus:
-            profileRes.metrics?.health_status || 'Needs improvement',
-        });
-      }
 
       if (assetsRes && assetsRes.success)
         setRiskMetrics(assetsRes.risk_metrics);
@@ -299,11 +299,10 @@ const MyFinancesPage = () => {
   };
 
   const handleResetCashflow = async () => {
-    if (
-      window.confirm(
-        'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas? Data tidak dapat dipulihkan.',
-      )
-    ) {
+    const isConfirm = window.confirm(
+      'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas? Data tidak dapat dipulihkan.',
+    );
+    if (isConfirm) {
       try {
         await api.resetCashflow();
         setCashflowHistory([]);
@@ -313,28 +312,33 @@ const MyFinancesPage = () => {
     }
   };
 
-  // ==========================================
-  // MANAJEMEN ASET
-  // ==========================================
-
-  // FUNGSI FIXED: Menghapus data dari Backend dan memperbarui UI dengan data asli dari database
+  // =========================================================================
+  // FUNGSI BARU: Hapus Asset ke Backend Supabase
+  // =========================================================================
   const handleDeleteAssetBackend = async (assetRow) => {
     try {
+      // Pastikan aset punya ID dari backend sebelum dihapus
       if (assetRow.id) {
         await api.deleteAsset(assetRow.id);
       }
-      // Memaksa penarikan data terbaru dari database agar ID selalu tersinkronisasi
+
+      // Hapus dari UI menggunakan context bawaan lo
+      deleteAssetCategory(assetRow.asset_category);
+
+      // Ambil data terbaru dari backend biar sinkron
       const assetsRes = await api.getAssets();
       if (assetsRes && assetsRes.success) {
         updateFinancialData({ assetsList: assetsRes.assets || [] });
-        setRiskMetrics(assetsRes.risk_metrics);
+        if (assetsRes.risk_metrics) setRiskMetrics(assetsRes.risk_metrics);
       }
     } catch (error) {
-      console.error('Gagal menghapus aset secara penuh dari backend:', error);
+      console.error('Gagal menghapus aset dari backend:', error);
     }
   };
 
-  // FUNGSI FIXED: Menyimpan aset ke Backend dan langsung menarik ID yang valid
+  // =========================================================================
+  // FUNGSI UPDATE: Menyimpan aset baru ke Backend supaya dapet ID
+  // =========================================================================
   const handleSaveNewAsset = async () => {
     if (!newAssetCategory || !newAssetValue) return;
 
@@ -349,16 +353,20 @@ const MyFinancesPage = () => {
     };
 
     try {
+      // Simpan ke database Supabase
       await api.saveAsset(newAsset);
 
-      // Mengambil ulang daftar aset dari database agar aset baru memiliki ID asli (UUID)
+      // Fetch ulang biar dapet ID asli dari database, jadi bisa dihapus
       const assetsRes = await api.getAssets();
       if (assetsRes && assetsRes.success) {
         updateFinancialData({ assetsList: assetsRes.assets || [] });
-        setRiskMetrics(assetsRes.risk_metrics);
+        if (assetsRes.risk_metrics) setRiskMetrics(assetsRes.risk_metrics);
+      } else {
+        addAssetCategory(newAsset); // Fallback kalo fetch gagal
       }
     } catch (error) {
       console.error('Gagal menyimpan aset ke backend:', error);
+      addAssetCategory(newAsset); // Fallback UI
     }
 
     setIsAssetModalOpen(false);
@@ -368,10 +376,6 @@ const MyFinancesPage = () => {
     setNewAssetPerf('In Line');
     setNewAssetDate(new Date().toISOString().split('T')[0]);
   };
-
-  // ==========================================
-  // MANAJEMEN TARGET KEUANGAN
-  // ==========================================
 
   const handleOpenAddTarget = () => {
     setEditingTargetId(null);
@@ -386,46 +390,28 @@ const MyFinancesPage = () => {
     setEditingTargetId(target.id);
     setNewTargetName(target.name || target.target_name || '');
     setNewTargetAmount(
-      target.targetAmount
-        ? target.targetAmount.toLocaleString('id-ID')
-        : target.target_amount
-          ? target.target_amount.toLocaleString('id-ID')
-          : '',
+      target.targetAmount ? target.targetAmount.toLocaleString('id-ID') : '',
     );
-    setNewTargetSaved(
-      target.saved
-        ? target.saved.toLocaleString('id-ID')
-        : target.current_progress
-          ? target.current_progress.toLocaleString('id-ID')
-          : '',
-    );
+    setNewTargetSaved(target.saved ? target.saved.toLocaleString('id-ID') : '');
     setNewTargetDeadline(target.deadline || '');
     setIsTargetModalOpen(true);
   };
 
-  // FUNGSI FIXED: Menyimpan target keuangan langsung ke backend
-  const handleSaveTarget = async () => {
+  const handleSaveTarget = () => {
     if (!newTargetName || !newTargetAmount) return;
 
-    const payload = {
-      target_name: newTargetName,
-      target_amount: parseCleanNum(newTargetAmount),
-      current_progress: parseCleanNum(newTargetSaved),
+    const targetData = {
+      name: newTargetName,
+      targetAmount: parseCleanNum(newTargetAmount),
+      saved: parseCleanNum(newTargetSaved),
+      deadline: newTargetDeadline,
+      isDefault: false,
     };
 
-    try {
-      if (editingTargetId) {
-        await api.updateTarget(editingTargetId, payload);
-      } else {
-        await api.saveTarget(payload);
-      }
-
-      const targetsRes = await api.getTargets();
-      if (targetsRes && targetsRes.success) {
-        updateFinancialData({ financialTargets: targetsRes.targets || [] });
-      }
-    } catch (error) {
-      console.error('Gagal menyimpan target ke backend:', error);
+    if (editingTargetId) {
+      updateFinancialTarget(editingTargetId, targetData);
+    } else {
+      addFinancialTarget(targetData);
     }
 
     setIsTargetModalOpen(false);
@@ -436,23 +422,9 @@ const MyFinancesPage = () => {
     setNewTargetDeadline('');
   };
 
-  // FUNGSI FIXED: Menghapus target keuangan secara permanen dari backend
-  const handleDeleteTargetBackend = async (targetId) => {
-    try {
-      if (targetId) {
-        await api.deleteTarget(targetId);
-      }
-      const targetsRes = await api.getTargets();
-      if (targetsRes && targetsRes.success) {
-        updateFinancialData({ financialTargets: targetsRes.targets || [] });
-      }
-    } catch (error) {
-      console.error('Gagal menghapus target dari backend:', error);
-    }
-  };
-
   return (
     <div className='finances-container animate-fade-in'>
+      {/* Tombol Pemilih Tab (Tab Switcher) */}
       <div className='tabs-container'>
         <button
           className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -470,7 +442,9 @@ const MyFinancesPage = () => {
 
       {activeTab === 'profile' && (
         <div className='profile-grid'>
+          {/* Kolom Kiri */}
           <div className='flex-col-gap'>
+            {/* Formulir Profil Keuangan Utama */}
             <div className='dash-card'>
               <div className='dash-card-header'>
                 <h3 className='dash-card-title'>Financial Profile</h3>
@@ -501,6 +475,7 @@ const MyFinancesPage = () => {
                   </label>
                   <input
                     id='profileMonth'
+                    name='profileMonth'
                     type='month'
                     className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
                     value={profileMonth}
@@ -513,6 +488,7 @@ const MyFinancesPage = () => {
                     }}
                   />
                 </div>
+
                 <div className='form-group'>
                   <label className='form-label' htmlFor='monthlyIncome'>
                     Monthly Income
@@ -521,6 +497,7 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='monthlyIncome'
+                      name='monthlyIncome'
                       type='text'
                       className='form-input'
                       value={monthlyIncome}
@@ -539,6 +516,7 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='monthlyExpenses'
+                      name='monthlyExpenses'
                       type='text'
                       className='form-input'
                       value={monthlyExpenses}
@@ -557,6 +535,7 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='emergencyFund'
+                      name='emergencyFund'
                       type='text'
                       className='form-input'
                       value={emergencyFund}
@@ -575,6 +554,7 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='totalDebt'
+                      name='totalDebt'
                       type='text'
                       className='form-input'
                       value={totalDebt}
@@ -593,6 +573,7 @@ const MyFinancesPage = () => {
                     <span className='form-prefix'>Rp</span>
                     <input
                       id='monthlyDebtPayment'
+                      name='monthlyDebtPayment'
                       type='text'
                       className='form-input'
                       value={monthlyDebtPayment}
@@ -606,6 +587,7 @@ const MyFinancesPage = () => {
                     />
                   </div>
                 </div>
+
                 <div className='form-group'>
                   <label className='form-label' htmlFor='netWorth'>
                     Net Worth (Auto-Calculated)
@@ -622,6 +604,7 @@ const MyFinancesPage = () => {
                     </span>
                     <input
                       id='netWorth'
+                      name='netWorth'
                       type='text'
                       className='form-input'
                       value={dynamicNetWorth.toLocaleString('id-ID')}
@@ -633,6 +616,7 @@ const MyFinancesPage = () => {
               </div>
             </div>
 
+            {/* Riwayat Arus Kas Bulanan */}
             <div className='dash-card dark'>
               <div
                 className='dash-card-header items-center'
@@ -660,6 +644,7 @@ const MyFinancesPage = () => {
                   <RotateCcw size={12} /> Reset Table
                 </button>
               </div>
+
               {isLoadingAssets ? (
                 <SkeletonLoader type='table' rows={3} />
               ) : (
@@ -713,6 +698,7 @@ const MyFinancesPage = () => {
                               <button
                                 onClick={() => handleDeleteCashflow(row.id)}
                                 className='text-slate-500 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 transition-colors inline-block'
+                                title='Hapus Riwayat'
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -736,12 +722,15 @@ const MyFinancesPage = () => {
             </div>
           </div>
 
+          {/* Kolom Kanan */}
           <div className='flex-col-gap'>
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+              {/* Widget Pelacak Kesehatan Finansial */}
               <div className='dash-card dark'>
                 <h3 className='dash-card-title text-white mb-6'>
                   Financial Health Tracker
                 </h3>
+
                 <div className='health-item'>
                   <span className='health-label'>Income/Month</span>
                   <div className='health-bar-container'>
@@ -755,6 +744,7 @@ const MyFinancesPage = () => {
                   </div>
                   <span className='health-badge bg-green-soft'>Good</span>
                 </div>
+
                 <div className='health-item'>
                   <span className='health-label'>Expense/Month</span>
                   <div className='health-bar-container'>
@@ -772,6 +762,7 @@ const MyFinancesPage = () => {
                   </div>
                   <span className='health-badge bg-yellow-soft'>Stable</span>
                 </div>
+
                 <div className='health-item'>
                   <span className='health-label'>Net Savings Rate</span>
                   <div className='health-bar-container'>
@@ -793,6 +784,7 @@ const MyFinancesPage = () => {
                     <span className='health-badge bg-green-soft'>Good</span>
                   )}
                 </div>
+
                 <div className='health-item'>
                   <span className='health-label'>Debt Ratio</span>
                   <div className='health-bar-container'>
@@ -808,6 +800,7 @@ const MyFinancesPage = () => {
                   </div>
                   <span className='health-badge bg-yellow-soft'>Stable</span>
                 </div>
+
                 <div className='mt-6 border-t border-slate-800 pt-4'>
                   <span className='savings-label-sm'>Net savings rate</span>
                   <div
@@ -837,6 +830,7 @@ const MyFinancesPage = () => {
                 </div>
               </div>
 
+              {/* Widget Skor Kesehatan (Lingkaran) */}
               <div className='dash-card dark health-score-card'>
                 <h3 className='dash-card-title text-white w-full text-left mb-6'>
                   Health score
@@ -865,7 +859,10 @@ const MyFinancesPage = () => {
                     <span className='circular-score-sub'>out of 100</span>
                   </div>
                 </div>
-                <div className='health-status-text'>{healthStatus}</div>
+                <div className='health-status-text'>
+                  {healthScore >= 70 ? 'Good - on track' : 'Needs improvement'}
+                </div>
+
                 <div className='health-metrics-row'>
                   <div className='health-metric-mini'>
                     <span
@@ -899,6 +896,7 @@ const MyFinancesPage = () => {
             </div>
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+              {/* Daftar Target Finansial */}
               <div className='dash-card dark flex-1'>
                 <div
                   className='dash-card-header items-center'
@@ -920,11 +918,13 @@ const MyFinancesPage = () => {
                     Set Up Targets
                   </button>
                 </div>
+
                 {(financialData.financialTargets || []).map((target) => {
                   let targetAmount =
                     target.targetAmount || target.target_amount || 0;
                   let savedAmount =
                     target.saved || target.current_progress || 0;
+
                   if (target.isDefault) {
                     if (target.id === 'emergency') {
                       targetAmount = expVal * 6;
@@ -933,6 +933,7 @@ const MyFinancesPage = () => {
                       savedAmount = parsedNetWorth;
                     }
                   }
+
                   const progress =
                     targetAmount > 0
                       ? Math.min(
@@ -940,6 +941,7 @@ const MyFinancesPage = () => {
                           Math.round((savedAmount / targetAmount) * 100),
                         )
                       : 0;
+
                   return (
                     <div
                       key={target.id || target.name}
@@ -949,12 +951,14 @@ const MyFinancesPage = () => {
                         <button
                           onClick={() => handleEditTarget(target)}
                           className='text-slate-400 hover:text-sky-400 bg-transparent border-none cursor-pointer p-0'
+                          title='Edit target'
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
-                          onClick={() => handleDeleteTargetBackend(target.id)}
+                          onClick={() => deleteFinancialTarget(target.id)}
                           className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-0'
+                          title='Delete target'
                         >
                           <Trash2 size={14} />
                         </button>
@@ -989,8 +993,15 @@ const MyFinancesPage = () => {
                     </div>
                   );
                 })}
+                {(!financialData.financialTargets ||
+                  financialData.financialTargets.length === 0) && (
+                  <div className='text-center text-slate-500 py-4 text-sm'>
+                    Belum ada target keuangan yang disetel.
+                  </div>
+                )}
               </div>
 
+              {/* Kotak Wawasan Konsultan AI */}
               <div
                 className='dash-card flex-1'
                 style={{
@@ -1011,12 +1022,14 @@ const MyFinancesPage = () => {
                 <p className='text-sm text-slate-800 leading-relaxed'>
                   Your emergency fund is currently at{' '}
                   {(emergVal / (expVal > 0 ? expVal : 1)).toFixed(1)} months'
-                  worth of expenses.
+                  worth of expenses. The ideal standard target is 6 months,
+                  which requires a total of Rp{' '}
+                  {emergencyTarget.toLocaleString('id-ID')}.
                   {savingsRate < 40
-                    ? ' Try allocating an additional 15% of your income.'
-                    : ' Excellent savings rate!'}
+                    ? ' Try allocating an additional 15% of your income to accelerate this goal.'
+                    : ' Excellent savings rate! You are in a secure position to gradually DCA into other assets.'}
                   {debtRatio > 30
-                    ? ' Caution: Your debt ratio is high.'
+                    ? ' Caution: Your debt ratio is high - prioritize paying off debt first.'
                     : ' Your debt ratio is within safe parameters.'}
                 </p>
               </div>
@@ -1035,12 +1048,17 @@ const MyFinancesPage = () => {
           </div>
         ) : (
           <div className='assets-grid animate-fade-in'>
+            {/* Baris Atas: Visualisasi Donut Chart */}
             <div className='dash-card'>
               <div className='dash-card-header'>
                 <div>
                   <h3 className='dash-card-title'>Asset Breakdown</h3>
+                  <p className='dash-card-subtitle'>
+                    Overview of assets in your portfolio
+                  </p>
                 </div>
               </div>
+
               {isLoadingAssets ? (
                 <SkeletonLoader type='pie' />
               ) : (
@@ -1073,6 +1091,7 @@ const MyFinancesPage = () => {
                       </span>
                     </div>
                   </div>
+
                   <div className='flex-1 w-full max-w-[200px] donut-legend'>
                     {pieData.map((item, idx) => (
                       <div key={idx} className='donut-legend-item'>
@@ -1105,16 +1124,36 @@ const MyFinancesPage = () => {
                     <div className='risk-metric-box'>
                       <span className='risk-metric-title'>Overall risk</span>
                       <span className='risk-metric-value text-yellow-500'>
-                        Medium
+                        {riskMetrics?.overall_risk || 'Medium'}
+                      </span>
+                      <span className='risk-metric-sub'>
+                        Volatility index:{' '}
+                        {riskMetrics?.volatility_index || '0.38'}
                       </span>
                     </div>
                     <div className='risk-metric-box'>
                       <span className='risk-metric-title'>Sharpe ratio</span>
                       <span className='risk-metric-value text-green-500'>
-                        1.14
+                        {riskMetrics?.sharpe_ratio || '1.14'}
                       </span>
+                      <span className='risk-metric-sub'>Above benchmark</span>
+                    </div>
+                    <div className='risk-metric-box'>
+                      <span className='risk-metric-title'>Max drawdown</span>
+                      <span className='risk-metric-value text-red-500'>
+                        {riskMetrics?.max_drawdown || '-6.2'}%
+                      </span>
+                      <span className='risk-metric-sub'>Last 12 months</span>
+                    </div>
+                    <div className='risk-metric-box'>
+                      <span className='risk-metric-title'>Beta</span>
+                      <span className='risk-metric-value text-white'>
+                        {riskMetrics?.beta || '0.82'}
+                      </span>
+                      <span className='risk-metric-sub'>vs IHSG</span>
                     </div>
                   </div>
+
                   <div className='mt-2'>
                     <span className='text-xs text-slate-400'>
                       Allocation vs ideal target
@@ -1136,6 +1175,7 @@ const MyFinancesPage = () => {
               )}
             </div>
 
+            {/* Tabel Detail Aset */}
             <div className='dash-card' style={{ gridColumn: '1 / -1' }}>
               <div
                 className='dash-card-header items-center'
@@ -1207,7 +1247,13 @@ const MyFinancesPage = () => {
                             </td>
                             <td>
                               <span
-                                className={`px-3 py-1 rounded-full text-[0.7rem] font-semibold ${row.performance === 'Outperform' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
+                                className={`px-3 py-1 rounded-full text-[0.7rem] font-semibold ${
+                                  row.performance === 'Outperform'
+                                    ? 'bg-green-100 text-green-700'
+                                    : row.performance === 'In Line'
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-red-100 text-red-700'
+                                }`}
                               >
                                 {row.performance}
                               </span>
