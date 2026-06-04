@@ -36,6 +36,8 @@ const MarketAnalysisPage = () => {
     'TLKM',
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // State untuk fitur pencarian
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fungsi untuk mendapatkan detail saham dari daftar yang tersedia atau menggunakan fallback
@@ -311,7 +313,6 @@ const MarketAnalysisPage = () => {
                   vertical={false}
                   stroke='#e2e8f0'
                 />
-                {/* minTickGap mencegah label tanggal pada sumbu X tumpang tindih jika data terlalu banyak */}
                 <XAxis
                   dataKey='name'
                   axisLine={false}
@@ -320,7 +321,6 @@ const MarketAnalysisPage = () => {
                   dy={10}
                   minTickGap={40}
                 />
-                {/* tickFormatter menyingkat nominal besar (misal menjadi 'Rp 1.5M') agar lebih rapi */}
                 <YAxis
                   axisLine={false}
                   tickLine={false}
@@ -355,7 +355,6 @@ const MarketAnalysisPage = () => {
                   }}
                 />
 
-                {/* Pengaturan dot={false} untuk mencegah grafik menjadi terlalu tebal/padat karena data yang besar */}
                 <Line
                   type='monotone'
                   dataKey='actualPrice'
@@ -505,8 +504,37 @@ const MarketAnalysisPage = () => {
         className='large-top-modal'
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Fitur Search Input */}
+          <input
+            type='text'
+            placeholder='Search ticker or company name...'
+            className='form-input'
+            style={{
+              padding: '0.75rem',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              width: '100%',
+              fontSize: '0.9rem',
+              color: '#0f172a',
+              backgroundColor: '#ffffff',
+            }}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+
           {availableStocks
-            .filter((stock) => !analyzedTickers.includes(stock.ticker))
+            .filter((stock) => {
+              // Pengaman agar tidak error jika data kosong dari API
+              const safeTicker = stock.ticker || '';
+              const safeName = stock.name || '';
+              const searchLower = searchTerm.toLowerCase();
+
+              return (
+                !analyzedTickers.includes(stock.ticker) &&
+                (safeTicker.toLowerCase().includes(searchLower) ||
+                  safeName.toLowerCase().includes(searchLower))
+              );
+            })
             .map((stock) => {
               const isPositive = stock.change_pct >= 0;
               return (
@@ -552,7 +580,7 @@ const MarketAnalysisPage = () => {
                         {stock.ticker}
                       </span>
                       <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                        Rp {stock.price.toLocaleString('id-ID')}
+                        {stock.name || 'Unknown Company'}
                       </span>
                       <span
                         style={{
@@ -584,6 +612,7 @@ const MarketAnalysisPage = () => {
                       setAnalyzedTickers((prev) => [...prev, stock.ticker]);
                       setSelectedTicker(stock.ticker);
                       setIsModalOpen(false);
+                      setSearchTerm(''); // Reset search setelah pilih
                     }}
                     className='hover:bg-blue-700'
                   >
@@ -593,10 +622,17 @@ const MarketAnalysisPage = () => {
               );
             })}
 
-          {/* Tampilan jika semua saham yang tersedia sudah masuk ke dalam daftar analisis */}
-          {availableStocks.filter(
-            (stock) => !analyzedTickers.includes(stock.ticker),
-          ).length === 0 && (
+          {/* Tampilan jika saham tidak ditemukan */}
+          {availableStocks.filter((stock) => {
+            const safeTicker = stock.ticker || '';
+            const safeName = stock.name || '';
+            const searchLower = searchTerm.toLowerCase();
+            return (
+              !analyzedTickers.includes(stock.ticker) &&
+              (safeTicker.toLowerCase().includes(searchLower) ||
+                safeName.toLowerCase().includes(searchLower))
+            );
+          }).length === 0 && (
             <div
               style={{
                 textAlign: 'center',
@@ -605,7 +641,7 @@ const MarketAnalysisPage = () => {
                 padding: '1rem 0',
               }}
             >
-              All stocks are currently being analyzed.
+              No stocks found matching your search.
             </div>
           )}
         </div>
