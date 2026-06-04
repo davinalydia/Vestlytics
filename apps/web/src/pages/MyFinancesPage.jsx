@@ -20,8 +20,17 @@ import './dashboard.css';
 
 const MyFinancesPage = () => {
   // Hanya mengekstrak data yang dibutuhkan, operasi CRUD akan diarahkan ke API langsung
-  const { financialData, updateFinancialData, healthScore, healthStatus } =
-    useContext(UserFinancialContext);
+  const {
+    financialData,
+    updateFinancialData,
+    addAssetCategory,
+    deleteAssetCategory,
+    addFinancialTarget,
+    updateFinancialTarget,
+    deleteFinancialTarget,
+    healthScore,
+    healthStatus,
+  } = useContext(UserFinancialContext);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'profile';
@@ -943,7 +952,6 @@ const MyFinancesPage = () => {
                         >
                           <Edit2 size={14} />
                         </button>
-                        {/* Memanggil fungsi hapus ke backend yang baru dibuat */}
                         <button
                           onClick={() => handleDeleteTargetBackend(target.id)}
                           className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-0'
@@ -1218,7 +1226,6 @@ const MyFinancesPage = () => {
                                 : '--'}
                             </td>
                             <td style={{ textAlign: 'right' }}>
-                              {/* Menggunakan fungsi penghapusan backend yang baru */}
                               <button
                                 onClick={() => handleDeleteAssetBackend(row)}
                                 className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 flex items-center justify-center transition-colors inline-block'
@@ -1238,31 +1245,370 @@ const MyFinancesPage = () => {
           </div>
         ))}
 
+      {/* Modal Penambahan Aset */}
       <Modal
         isOpen={isAssetModalOpen}
         onClose={() => setIsAssetModalOpen(false)}
         title='Add Asset Category'
         className='large-top-modal'
       >
-        <div className='flex justify-end gap-3 pt-4 border-t border-slate-100'>
-          <button
-            onClick={() => setIsAssetModalOpen(false)}
-            className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold'
-            style={{ background: 'none', cursor: 'pointer' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSaveNewAsset}
-            className='px-4 py-2 rounded-lg text-white font-semibold'
-            style={{
-              backgroundColor: '#0ea5e9',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            Save Asset
-          </button>
+        <div className='space-y-4 text-left'>
+          <div className='bg-indigo-50 border border-indigo-200 text-indigo-800 p-3 rounded-lg text-xs'>
+            <strong className='text-indigo-900 block mb-1'>
+              AI Asset Idea:
+            </strong>
+            Need ideas for portfolio diversification? You can add:
+            <ul className='list-disc pl-4 mt-1 space-y-1'>
+              <li>
+                <strong>Mutual Funds</strong>: (Stable growth, YTD Return ~6-8%,
+                Performance: "In Line")
+              </li>
+              <li>
+                <strong>Cryptocurrency</strong>: (High risk & volatility, YTD
+                Return ~35-50%, Performance: "Outperform")
+              </li>
+              <li>
+                <strong>Real Estate</strong>: (Tangible property value, YTD
+                Return ~4-6%, Performance: "In Line")
+              </li>
+            </ul>
+          </div>
+          <div className='flex flex-wrap gap-2 mb-2'>
+            <span className='text-xs text-slate-500 w-full font-medium'>
+              Or choose a template:
+            </span>
+            <button
+              type='button'
+              onClick={() => {
+                setNewAssetCategory('Cryptocurrency');
+                setNewAssetValue('20.000.000');
+                setNewAssetReturn('45.0');
+                setNewAssetPerf('Outperform');
+              }}
+              className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+            >
+              Crypto Template
+            </button>
+            <button
+              type='button'
+              onClick={() => {
+                setNewAssetCategory('Mutual Funds');
+                setNewAssetValue('15.000.000');
+                setNewAssetReturn('7.5');
+                setNewAssetPerf('In Line');
+              }}
+              className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+            >
+              Mutual Funds Template
+            </button>
+            <button
+              type='button'
+              onClick={() => {
+                setNewAssetCategory('Real Estate');
+                setNewAssetValue('150.000.000');
+                setNewAssetReturn('5.0');
+                setNewAssetPerf('In Line');
+              }}
+              className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+            >
+              Real Estate Template
+            </button>
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newAssetCategory'>
+              Category Name
+            </label>
+            <input
+              id='newAssetCategory'
+              type='text'
+              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
+              placeholder='e.g. Cryptocurrency'
+              style={{ color: '#0f172a' }}
+              value={newAssetCategory}
+              onChange={(e) => setNewAssetCategory(e.target.value)}
+            />
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newAssetValue'>
+              Current Value (Rp)
+            </label>
+            <div className='form-input-wrapper'>
+              <span className='form-prefix'>Rp</span>
+              <input
+                id='newAssetValue'
+                type='text'
+                className='form-input'
+                placeholder='e.g. 10.000.000'
+                value={newAssetValue}
+                onChange={(e) =>
+                  handleNumericChange(e.target.value, setNewAssetValue)
+                }
+              />
+            </div>
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newAssetReturn'>
+              YTD Return (%)
+            </label>
+            <input
+              id='newAssetReturn'
+              type='number'
+              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
+              placeholder='e.g. 12.5'
+              step='0.1'
+              style={{ color: '#0f172a' }}
+              value={newAssetReturn}
+              onChange={(e) => setNewAssetReturn(e.target.value)}
+            />
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newAssetPerf'>
+              Performance Status
+            </label>
+            <select
+              id='newAssetPerf'
+              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
+              style={{ color: '#0f172a', appearance: 'auto' }}
+              value={newAssetPerf}
+              onChange={(e) => setNewAssetPerf(e.target.value)}
+            >
+              <option value='Outperform'>Outperform</option>
+              <option value='In Line'>In Line</option>
+              <option value='Underperform'>Underperform</option>
+            </select>
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newAssetDate'>
+              Date / Tanggal
+            </label>
+            <input
+              id='newAssetDate'
+              type='date'
+              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
+              style={{ color: '#0f172a' }}
+              value={newAssetDate}
+              onChange={(e) => setNewAssetDate(e.target.value)}
+              onClick={(e) => {
+                try {
+                  e.target.showPicker();
+                } catch {
+                  // Fallback jika API browser tidak mendukung showPicker()
+                }
+              }}
+            />
+          </div>
+          <div className='flex justify-end gap-3 pt-4 border-t border-slate-100'>
+            <button
+              onClick={() => setIsAssetModalOpen(false)}
+              className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold'
+              style={{ background: 'none', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveNewAsset}
+              className='px-4 py-2 rounded-lg text-white font-semibold'
+              style={{
+                backgroundColor: '#0ea5e9',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Save Asset
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Konfigurasi (Tambah & Edit) Target Keuangan */}
+      <Modal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        title={
+          editingTargetId
+            ? 'Edit Financial Target'
+            : 'Configure Financial Targets'
+        }
+        className='large-top-modal'
+      >
+        <div className='space-y-4 text-left'>
+          {!editingTargetId && (
+            <>
+              <div className='bg-cyan-50 border border-cyan-200 text-cyan-800 p-3 rounded-lg text-xs'>
+                <strong className='text-cyan-900 block mb-1'>
+                  AI Target Recommendation:
+                </strong>
+                Based on your monthly surplus of{' '}
+                <strong>Rp {netSavings.toLocaleString('id-ID')}</strong>:
+                <ul className='list-disc pl-4 mt-1 space-y-1'>
+                  <li>
+                    An Emergency Fund of{' '}
+                    <strong>Rp {(expVal * 6).toLocaleString('id-ID')}</strong>{' '}
+                    (6x expenses) is recommended and can be achieved in{' '}
+                    <strong>
+                      {netSavings > 0
+                        ? Math.ceil((expVal * 6 - emergVal) / netSavings)
+                        : ' '}{' '}
+                      months
+                    </strong>
+                    .
+                  </li>
+                  <li>
+                    A custom Rp 150M property purchase goal will take{' '}
+                    <strong>
+                      {netSavings > 0 ? Math.ceil(150000000 / netSavings) : ' '}{' '}
+                      months
+                    </strong>{' '}
+                    of surplus accumulation.
+                  </li>
+                </ul>
+              </div>
+              <div className='flex flex-wrap gap-2 mb-2'>
+                <span className='text-xs text-slate-500 w-full font-medium'>
+                  Or choose a template:
+                </span>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setNewTargetName('Down Payment for House');
+                    setNewTargetAmount('150.000.000');
+                    setNewTargetSaved('15.000.000');
+                    setNewTargetDeadline('');
+                  }}
+                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+                >
+                  House DP Template
+                </button>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setNewTargetName('Hajj / Pilgrimage');
+                    setNewTargetAmount('50.000.000');
+                    setNewTargetSaved('5.000.000');
+                    setNewTargetDeadline('');
+                  }}
+                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+                >
+                  Pilgrimage Template
+                </button>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setNewTargetName('New Car');
+                    setNewTargetAmount('250.000.000');
+                    setNewTargetSaved('20.000.000');
+                    setNewTargetDeadline('');
+                  }}
+                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+                >
+                  New Car Template
+                </button>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setNewTargetName('Emergency Fund (Extra)');
+                    setNewTargetAmount((expVal * 12).toLocaleString('id-ID'));
+                    setNewTargetSaved(emergVal.toLocaleString('id-ID'));
+                    setNewTargetDeadline('');
+                  }}
+                  className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg border-none cursor-pointer font-medium'
+                >
+                  12x Expenses Template
+                </button>
+              </div>
+            </>
+          )}
+
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newTargetName'>
+              Target Goal Name
+            </label>
+            <input
+              id='newTargetName'
+              type='text'
+              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
+              placeholder='e.g. Marriage or Education Fund'
+              style={{ color: '#0f172a' }}
+              value={newTargetName}
+              onChange={(e) => setNewTargetName(e.target.value)}
+            />
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newTargetAmount'>
+              Target Amount (Rp)
+            </label>
+            <div className='form-input-wrapper'>
+              <span className='form-prefix'>Rp</span>
+              <input
+                id='newTargetAmount'
+                type='text'
+                className='form-input'
+                placeholder='e.g. 50.000.000'
+                value={newTargetAmount}
+                onChange={(e) =>
+                  handleNumericChange(e.target.value, setNewTargetAmount)
+                }
+              />
+            </div>
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newTargetSaved'>
+              Current Savings (Rp)
+            </label>
+            <div className='form-input-wrapper'>
+              <span className='form-prefix'>Rp</span>
+              <input
+                id='newTargetSaved'
+                type='text'
+                className='form-input'
+                placeholder='e.g. 5.000.000'
+                value={newTargetSaved}
+                onChange={(e) =>
+                  handleNumericChange(e.target.value, setNewTargetSaved)
+                }
+              />
+            </div>
+          </div>
+          <div className='form-group'>
+            <label className='form-label' htmlFor='newTargetDeadline'>
+              Deadline / Timeframe
+            </label>
+            <input
+              id='newTargetDeadline'
+              type='date'
+              className='form-input w-full px-4 py-2.5 rounded-lg border border-slate-200'
+              style={{ color: '#0f172a' }}
+              value={newTargetDeadline}
+              onChange={(e) => setNewTargetDeadline(e.target.value)}
+              onClick={(e) => {
+                try {
+                  e.target.showPicker();
+                } catch {
+                  // Fallback jika API browser tidak mendukung showPicker()
+                }
+              }}
+            />
+          </div>
+          <div className='flex justify-end gap-3 pt-4 border-t border-slate-100'>
+            <button
+              onClick={() => setIsTargetModalOpen(false)}
+              className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold'
+              style={{ background: 'none', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveTarget}
+              className='px-4 py-2 rounded-lg text-white font-semibold'
+              style={{
+                backgroundColor: '#0ea5e9',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {editingTargetId ? 'Update Goal' : 'Save Goal'}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>
