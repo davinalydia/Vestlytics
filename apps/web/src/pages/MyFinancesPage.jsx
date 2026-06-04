@@ -156,14 +156,21 @@ const MyFinancesPage = () => {
     return isNegative ? -cleanNumber : cleanNumber;
   };
 
+  // ==============================================================================
+  // FIX: Pemisahan totalDebtVal dan monthlyDebtPaymentVal untuk sinkronisasi skor
+  // ==============================================================================
   const incVal = parseCleanNum(monthlyIncome);
   const expVal = parseCleanNum(monthlyExpenses);
   const emergVal = parseCleanNum(emergencyFund);
-  const debtVal = parseCleanNum(totalDebt);
+
+  const totalDebtVal = parseCleanNum(totalDebt);
+  const monthlyDebtPaymentVal = parseCleanNum(monthlyDebtPayment);
 
   const netSavings = incVal - expVal;
   const savingsRate = incVal > 0 ? (netSavings / incVal) * 100 : 0;
-  const debtRatio = incVal > 0 ? (debtVal / incVal) * 100 : 0;
+
+  // Hitung rasio utang murni menggunakan cicilan per bulan (DTI) agar skor tidak nyungsep
+  const debtRatio = incVal > 0 ? (monthlyDebtPaymentVal / incVal) * 100 : 0;
 
   const emergencyTarget = expVal * 6;
   const assetsList = financialData.assetsList || [];
@@ -173,7 +180,8 @@ const MyFinancesPage = () => {
   );
 
   const baseAssets = totalAssetsSum > 0 ? totalAssetsSum : emergVal;
-  const dynamicNetWorth = baseAssets - debtVal;
+  // Kalkulasi Net Worth murni dikurangi total sisa utang keseluruhan
+  const dynamicNetWorth = baseAssets - totalDebtVal;
   const parsedNetWorth = dynamicNetWorth;
 
   const pieData =
@@ -237,9 +245,14 @@ const MyFinancesPage = () => {
     return dateB - dateA;
   });
 
+  // Sinkronisasi logika kalkulasi real-time persis seperti di backend portfolio.js
   const healthScore = Math.round(
     Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
   );
+
+  let healthStatusText = 'Needs improvement';
+  if (healthScore >= 70) healthStatusText = 'Good - on track';
+  else if (healthScore >= 50) healthStatusText = 'Fair - needs attention';
 
   const handleSubmitProfile = async () => {
     setIsSubmitting(true);
@@ -248,11 +261,11 @@ const MyFinancesPage = () => {
     try {
       const payload = {
         month_period: profileMonth,
-        monthly_income: parseCleanNum(monthlyIncome),
-        monthly_expenses: parseCleanNum(monthlyExpenses),
-        emergency_fund: parseCleanNum(emergencyFund),
-        total_debt: parseCleanNum(totalDebt),
-        monthly_debt_payment: parseCleanNum(monthlyDebtPayment),
+        monthly_income: incVal,
+        monthly_expenses: expVal,
+        emergency_fund: emergVal,
+        total_debt: totalDebtVal,
+        monthly_debt_payment: monthlyDebtPaymentVal,
       };
 
       await api.saveProfile(payload);
@@ -312,20 +325,14 @@ const MyFinancesPage = () => {
     }
   };
 
-  // =========================================================================
-  // FUNGSI BARU: Hapus Asset ke Backend Supabase
-  // =========================================================================
   const handleDeleteAssetBackend = async (assetRow) => {
     try {
-      // Pastikan aset punya ID dari backend sebelum dihapus
       if (assetRow.id) {
         await api.deleteAsset(assetRow.id);
       }
 
-      // Hapus dari UI menggunakan context bawaan lo
       deleteAssetCategory(assetRow.asset_category);
 
-      // Ambil data terbaru dari backend biar sinkron
       const assetsRes = await api.getAssets();
       if (assetsRes && assetsRes.success) {
         updateFinancialData({ assetsList: assetsRes.assets || [] });
@@ -336,9 +343,6 @@ const MyFinancesPage = () => {
     }
   };
 
-  // =========================================================================
-  // FUNGSI UPDATE: Menyimpan aset baru ke Backend supaya dapet ID
-  // =========================================================================
   const handleSaveNewAsset = async () => {
     if (!newAssetCategory || !newAssetValue) return;
 
@@ -353,20 +357,18 @@ const MyFinancesPage = () => {
     };
 
     try {
-      // Simpan ke database Supabase
       await api.saveAsset(newAsset);
 
-      // Fetch ulang biar dapet ID asli dari database, jadi bisa dihapus
       const assetsRes = await api.getAssets();
       if (assetsRes && assetsRes.success) {
         updateFinancialData({ assetsList: assetsRes.assets || [] });
         if (assetsRes.risk_metrics) setRiskMetrics(assetsRes.risk_metrics);
       } else {
-        addAssetCategory(newAsset); // Fallback kalo fetch gagal
+        addAssetCategory(newAsset);
       }
     } catch (error) {
       console.error('Gagal menyimpan aset ke backend:', error);
-      addAssetCategory(newAsset); // Fallback UI
+      addAssetCategory(newAsset);
     }
 
     setIsAssetModalOpen(false);
@@ -859,9 +861,7 @@ const MyFinancesPage = () => {
                     <span className='circular-score-sub'>out of 100</span>
                   </div>
                 </div>
-                <div className='health-status-text'>
-                  {healthScore >= 70 ? 'Good - on track' : 'Needs improvement'}
-                </div>
+                <div className='health-status-text'>{healthStatusText}</div>
 
                 <div className='health-metrics-row'>
                   <div className='health-metric-mini'>
