@@ -44,9 +44,11 @@ router.get('/profile', requireAuth, async (req, res) => {
       ? (profile.monthly_debt_payment / profile.monthly_income) * 100
       : 0;
 
-  const healthScore = Math.round(
-    Math.min(100, Math.max(10, savingsRate * 1.5 + (50 - debtRatio * 0.5))),
-  );
+  const savingsScore = Math.min(35, savingsRate);
+  const emergScore = Math.min(35, (emergRatio / 6) * 35);
+  const debtScore = Math.max(0, 20 - debtRatio * 0.5);
+
+  const healthScore = Math.round(10 + savingsScore + emergScore + debtScore);
 
   let healthStatus = 'Needs improvement';
   if (healthScore >= 70) healthStatus = 'Good - on track';
