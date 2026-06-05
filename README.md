@@ -72,3 +72,10 @@ Buka tab terminal satu lagi, lalu jalankan client frontend:
 
 ## Alamat web deployment
 [Web Vestlytics](vestlytics-web.netlify.app)
+
+---
+
+## 🤖 Model AI (Untuk Fitur AI)
+Anda dapat mengunduh seluruh berkas model yang diperlukan untuk menjalankan fitur prediksi finansial melalui tautan Google Drive di bawah ini:
+
+👉 [Unduh Berkas Model AI Vestlytics di Sini](https://drive.google.com/drive/folders/1D4kVdj5-rA6sLgOBFUXs9O5OUPm-deGi?usp=drive_link)
