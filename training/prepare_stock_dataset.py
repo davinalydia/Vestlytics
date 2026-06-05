@@ -141,43 +141,113 @@ def save_sequences(X_train, X_test, y_train, y_test, path):
 # =========================================================
 # MAIN
 # =========================================================
-
 def main():
-    data_path  = Path("../data/stock_data/lq45_feature_engineering.csv")
-    output_dir = Path("../data/processed")
+
+    # =====================================================
+    # BASE DIRECTORY PROJECT
+    # =====================================================
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
+    data_path = BASE_DIR / "data" / "stock_data" / "lq45_feature_engineering.csv"
+    output_dir = BASE_DIR / "data" / "processed"
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    df           = load_dataset(str(data_path))
+    print(f"\nDataset Path : {data_path}")
+    print(f"Output Path  : {output_dir}")
+
+    # =====================================================
+    # LOAD DATASET
+    # =====================================================
+
+    df = load_dataset(str(data_path))
     feature_cols = select_features(df)
 
-    # Fit scaler terpisah untuk short dan long
+    # =====================================================
+    # FIT SCALER
+    # =====================================================
+
     print("\nFitting scalers...")
-    scaler_short = fit_scaler(df, feature_cols, str(output_dir / "scaler_short.pkl"))
-    scaler_long  = fit_scaler(df, feature_cols, str(output_dir / "scaler_long.pkl"))
 
-    # Short-Medium Term
+    scaler_short = fit_scaler(
+        df,
+        feature_cols,
+        str(output_dir / "scaler_short.pkl")
+    )
+
+    scaler_long = fit_scaler(
+        df,
+        feature_cols,
+        str(output_dir / "scaler_long.pkl")
+    )
+
+    # =====================================================
+    # SHORT TERM
+    # =====================================================
+
     print("\n── SHORT-MEDIUM TERM ──")
-    X_s, y_s = build_all_sequences(df, feature_cols, scaler_short,
-                                    SHORT_WINDOW, SHORT_HORIZON, "short")
+
+    X_s, y_s = build_all_sequences(
+        df,
+        feature_cols,
+        scaler_short,
+        SHORT_WINDOW,
+        SHORT_HORIZON,
+        "short"
+    )
+
     Xs_tr, Xs_te, ys_tr, ys_te = temporal_split(X_s, y_s)
-    save_sequences(Xs_tr, Xs_te, ys_tr, ys_te, str(output_dir / "short_term_sequences.npz"))
 
-    # Long Term
+    save_sequences(
+        Xs_tr,
+        Xs_te,
+        ys_tr,
+        ys_te,
+        str(output_dir / "short_term_sequences.npz")
+    )
+
+    # =====================================================
+    # LONG TERM
+    # =====================================================
+
     print("\n── LONG TERM ──")
-    X_l, y_l = build_all_sequences(df, feature_cols, scaler_long,
-                                    LONG_WINDOW, LONG_HORIZON, "long")
+
+    X_l, y_l = build_all_sequences(
+        df,
+        feature_cols,
+        scaler_long,
+        LONG_WINDOW,
+        LONG_HORIZON,
+        "long"
+    )
+
     Xl_tr, Xl_te, yl_tr, yl_te = temporal_split(X_l, y_l)
-    save_sequences(Xl_tr, Xl_te, yl_tr, yl_te, str(output_dir / "long_term_sequences.npz"))
 
-    print("\n" + "="*50)
-    print("✓ PREPARE SELESAI — lanjut ke STEP 2:")
-    print("  python train_stock_forecasting_model.py")
-    print("="*50)
-    print(f"\n  Catat ini untuk training:")
-    print(f"  n_features  = {len(feature_cols)}")
-    print(f"  SHORT window= {SHORT_WINDOW}, horizon= {SHORT_HORIZON} hari")
-    print(f"  LONG  window= {LONG_WINDOW},  horizon= {LONG_HORIZON} hari")
+    save_sequences(
+        Xl_tr,
+        Xl_te,
+        yl_tr,
+        yl_te,
+        str(output_dir / "long_term_sequences.npz")
+    )
 
+    # =====================================================
+    # DONE
+    # =====================================================
+
+    print("\n" + "=" * 50)
+    print("✓ PREPARE SELESAI")
+    print("=" * 50)
+
+    print(f"\nJumlah Features : {len(feature_cols)}")
+    print(f"SHORT Window    : {SHORT_WINDOW}")
+    print(f"SHORT Horizon   : {SHORT_HORIZON}")
+    print(f"LONG Window     : {LONG_WINDOW}")
+    print(f"LONG Horizon    : {LONG_HORIZON}")
+
+# =====================================================
+# ENTRY POINT
+# =====================================================
 
 if __name__ == "__main__":
     main()

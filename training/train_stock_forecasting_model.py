@@ -233,9 +233,16 @@ def train_one_model(
 # =========================================================
 
 def main():
-    processed_dir = Path("../data/processed")
-    output_dir    = Path("../models")
-    log_dir       = Path("../logs")
+
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
+    processed_dir = BASE_DIR / "data" / "processed"
+    output_dir    = BASE_DIR / "models"
+    log_dir       = BASE_DIR / "logs"
+
+    print(f"\nProcessed Dir : {processed_dir}")
+    print(f"Models Dir    : {output_dir}")
+    print(f"Logs Dir      : {log_dir}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)

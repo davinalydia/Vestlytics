@@ -10,4 +10,6 @@ __pycache__/
 *.pyc
 
 # TensorBoard logs
-logs/
+logs/data/stock_data/lq45_feature_engineering.csv
+data/stock_data/lq45_feature_engineering.csv
+data/stock_data/lq45_raw_data_2015_2025.csv
