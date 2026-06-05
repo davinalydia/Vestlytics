@@ -1,0 +1,15 @@
+# File processed — bisa di-generate ulang
+data/processed/*.npz
+data/processed/*.pkl
+
+# Model files — bisa di-generate ulang dengan training
+models/*.keras
+
+# Python cache
+__pycache__/
+*.pyc
+
+# TensorBoard logs
+logs/data/stock_data/lq45_feature_engineering.csv
+data/stock_data/lq45_feature_engineering.csv
+data/stock_data/lq45_raw_data_2015_2025.csv
