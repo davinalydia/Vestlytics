@@ -13,3 +13,6 @@ __pycache__/
 logs/data/stock_data/lq45_feature_engineering.csv
 data/stock_data/lq45_feature_engineering.csv
 data/stock_data/lq45_raw_data_2015_2025.csv
+
+# Virtual Environment
+.venv

@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from VESTYLITICS.training.inference_and_insight_backup2 import (
+# from VESTYLITICS.training.inference_and_insight_backup2 import (
+#     VestlyticsEngine
+# )
+
+from training.inference_and_insight_backup2 import (
     VestlyticsEngine
 )
 
