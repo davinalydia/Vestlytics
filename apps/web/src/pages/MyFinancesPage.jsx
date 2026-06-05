@@ -1068,19 +1068,6 @@ const MyFinancesPage = () => {
                         ? aiInsight.description
                         : 'Sistem sedang menganalisis profil Anda. Silakan isi dan simpan data keuangan untuk mendapatkan wawasan terbaru.'}
                     </p>
-
-                    {aiInsight && aiInsight.tags && (
-                      <div className='flex flex-wrap gap-2 mt-1'>
-                        {aiInsight.tags.map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className='bg-purple-100 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider'
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

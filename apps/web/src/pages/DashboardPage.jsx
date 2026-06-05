@@ -569,18 +569,6 @@ const DashboardPage = () => {
                     ? aiInsight.description
                     : 'Belum ada wawasan AI yang dapat ditampilkan. Silakan perbarui profil keuangan Anda.'}
                 </p>
-                {aiInsight && aiInsight.tags && (
-                  <div className='flex flex-wrap gap-2 mt-1'>
-                    {aiInsight.tags.map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className='bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider'
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
