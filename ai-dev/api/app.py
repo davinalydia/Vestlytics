@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from training.inference_and_insight import (
     RealLSTMForecastEngine,
     run_user_analysis,
-    DATASET_KEUANGAN_PATH,
 )
 
 # =========================================================
@@ -21,19 +20,15 @@ engine = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Load model sekali saat startup.
+    Load model sekali saat startup server.
     """
-
     global engine
 
     print("Loading RealLSTMForecastEngine...")
-
     engine = RealLSTMForecastEngine()
-
     print("Engine loaded successfully.")
 
     yield
-
     print("FastAPI shutdown.")
 
 
@@ -48,7 +43,7 @@ app = FastAPI(
 )
 
 # =========================================================
-# CORS
+# CORS MIDDLEWARE
 # =========================================================
 
 app.add_middleware(
@@ -60,11 +55,16 @@ app.add_middleware(
 )
 
 # =========================================================
-# REQUEST MODEL
+# DYNAMIC REQUEST MODEL (HAPUS USER_ID)
 # =========================================================
 
 class AnalyzeRequest(BaseModel):
-    user_id: int
+    investment_amount: float
+    debt_to_income_ratio: float
+    emergency_fund: float
+    monthly_expense_total: float
+    ticker: str
+    jumlah_lot: int
 
 
 # =========================================================
@@ -87,7 +87,7 @@ def health_check():
 
 
 # =========================================================
-# ANALYZE PORTFOLIO
+# ANALYZE PORTFOLIO ENDPOINT
 # =========================================================
 
 @app.post("/api/analyze-portfolio")
@@ -104,31 +104,32 @@ def analyze_portfolio_api(
         )
 
     try:
-
+        # Eksekusi pipeline dynamic menggunakan input langsung dari request body
         result = run_user_analysis(
-            user_id=request.user_id,
+            investment_amount=request.investment_amount,
+            debt_to_income_ratio=request.debt_to_income_ratio,
+            emergency_fund=request.emergency_fund,
+            monthly_expense_total=request.monthly_expense_total,
+            ticker=request.ticker,
+            jumlah_lot=request.jumlah_lot,
             engine=engine,
-            dataset_path=DATASET_KEUANGAN_PATH,
         )
 
         return result
 
     except ValueError as e:
-
         raise HTTPException(
-            status_code=404,
+            status_code=400,
             detail=str(e),
         )
 
     except FileNotFoundError as e:
-
         raise HTTPException(
             status_code=500,
             detail=str(e),
         )
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
             detail=f"Unexpected Error: {str(e)}"

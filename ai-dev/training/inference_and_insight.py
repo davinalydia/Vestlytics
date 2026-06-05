@@ -1,16 +1,14 @@
 """
 inference_and_insight.py
 --------------------------------------------------------
-Vestlytics Portfolio Analysis Engine
+Vestlytics Portfolio Analysis Engine (Dynamic Input Version)
 
 Versi Produksi Berbasis Model Nyata:
-1. Financial Readiness (Hasil K-Means dari Data Science)
+1. Financial Readiness (Prediksi K-Means Real-time dari Data Input)
 2. Portfolio Ownership & Validation Edge Case
 3. Real LSTM Forecasting Engine (Menggunakan Opsi A: CSV Ter-engineered)
 4. Portfolio Decision Engine (Buy / Hold / Sell / Switch / No Portfolio)
 5. JSON-ready API Response
-
-Author: Vestlytics AI Team
 """
 
 from __future__ import annotations
@@ -20,11 +18,13 @@ from pathlib import Path
 from typing import Any, Dict
 
 import joblib
-from matplotlib import ticker
 import numpy as np
 import pandas as pd
 from tensorflow.keras.models import load_model
 
+# =========================================================
+# PATH CONFIGURATION
+# =========================================================
 # =========================================================
 # PATH CONFIGURATION
 # =========================================================
@@ -40,11 +40,15 @@ SCALER_LONG_PATH = (
 )
 
 STOCK_DATA_PATH = (
-    BASE_DIR / "data" / "stock_data" / "lq45_feature_engineering.csv"
+    BASE_DIR / "data" / "stock_data" / "lq45_clean_dataset.csv"
 )
 
-DATASET_KEUANGAN_PATH = (
-    BASE_DIR / "data" / "financial_data" / "dataset_keuangan.csv"
+FINANCIAL_KMEANS_PATH = (
+    BASE_DIR / "models" / "financial_readiness_kmeans.pkl"
+)
+
+FINANCIAL_SCALER_PATH = (
+    BASE_DIR / "models" / "financial_readiness_scaler.pkl"
 )
 
 # =========================================================
@@ -79,7 +83,6 @@ FEATURE_COLS = [
     "Momentum_7",
     "Relative_Volume",
 ]
-
 # =========================================================
 # REAL LSTM FORECAST ENGINE
 # =========================================================
@@ -119,11 +122,39 @@ class RealLSTMForecastEngine:
         return stock
 
     def prepare_input(self, ticker: str) -> tuple[np.ndarray, pd.DataFrame]:
-        """Memotong data sebanyak 60 hari terakhir dan melakukan normalisasi."""
+        """Memotong data sebanyak 60 hari terakhir dan melakukan normalisasi dengan auto-feature engineering."""
         stock = self.get_ticker_data(ticker)
-        features = stock[FEATURE_COLS].copy()
+        
+        # =========================================================
+        # AUTO-FEATURE ENGINEERING FALLBACK (BIAR GAK ERROR NOT IN INDEX)
+        # =========================================================
+        if "Return" not in stock.columns:
+            stock["Return"] = stock["Close"].pct_change().fillna(0)
+        if "Volatility" not in stock.columns:
+            stock["Volatility"] = stock["Return"].rolling(window=7).std().fillna(0)
+        if "Volatility_30" not in stock.columns:
+            stock["Volatility_30"] = stock["Return"].rolling(window=30).std().fillna(0)
+        if "MA7" not in stock.columns:
+            stock["MA7"] = stock["Close"].rolling(window=7).mean().fillna(stock["Close"])
+        if "MA20" not in stock.columns:
+            stock["MA20"] = stock["Close"].rolling(window=20).mean().fillna(stock["Close"])
+        if "MA30" not in stock.columns:
+            stock["MA30"] = stock["Close"].rolling(window=30).mean().fillna(stock["Close"])
+        if "MA5" not in stock.columns:
+            stock["MA5"] = stock["Close"].rolling(window=5).mean().fillna(stock["Close"])
+        if "Price_Range" not in stock.columns:
+            stock["Price_Range"] = stock["High"] - stock["Low"]
+        if "Price_Change" not in stock.columns:
+            stock["Price_Change"] = stock["Close"] - stock["Open"]
+        if "Close_Lag_1" not in stock.columns:
+            stock["Close_Lag_1"] = stock["Close"].shift(1).fillna(stock["Close"])
+        if "Momentum_7" not in stock.columns:
+            stock["Momentum_7"] = stock["Close"] - stock["Close"].shift(7).fillna(0)
+        if "Relative_Volume" not in stock.columns:
+            ma_vol = stock["Volume"].rolling(window=20).mean().fillna(1)
+            stock["Relative_Volume"] = stock["Volume"] / np.where(ma_vol == 0, 1, ma_vol)
 
-        # Transform data menggunakan scaler pelatihan (17 kolom)
+        features = stock[FEATURE_COLS].copy()
         scaled = self.scaler.transform(features)
 
         if len(scaled) < self.WINDOW_SIZE:
@@ -132,32 +163,24 @@ class RealLSTMForecastEngine:
                 f"Dibutuhkan minimal {self.WINDOW_SIZE} baris untuk input LSTM."
             )
 
-        # Ambil jendela data terakhir
         X = scaled[-self.WINDOW_SIZE:]
-
-        # Reshape menjadi format 3D tensor LSTM: (samples=1, timesteps=60, features=17)
         return X.reshape(1, self.WINDOW_SIZE, len(FEATURE_COLS)), stock
 
     def predict_stock(self, ticker: str) -> Dict[str, Any]:
-    
         """Melakukan inferensi model dan mengembalikan prediksi arah serta risiko."""
         X, stock = self.prepare_input(ticker)
 
-        # Prediksi nilai close masa depan ter-scale
         pred = self.model.predict(X, verbose=0)
         pred_scaled = float(pred[0][0])
 
-        # Mengakali dimensi inverse_transform dengan membuat dummy array 17 kolom
         dummy = np.zeros((1, len(FEATURE_COLS)))
-        dummy[0, 0] = pred_scaled  # Kolom indeks 0 dipetakan sebagai 'Close'
+        dummy[0, 0] = pred_scaled
 
         pred_close = self.scaler.inverse_transform(dummy)[0][0]
         last_close = float(stock["Close"].iloc[-1])
 
-        # Menghitung persentase return proyeksi masa depan
         return_pct = ((pred_close - last_close) / last_close) * 100
 
-        # Penentuan arah pergerakan tren berdasarkan threshold return 2%
         if return_pct > 2:
             trend = "Naik"
         elif return_pct < -2:
@@ -165,17 +188,8 @@ class RealLSTMForecastEngine:
         else:
             trend = "Sideways"
 
-        # Penentuan tingkat volatilitas/risiko berdasarkan data volatilitas terbaru
         current_vol = float(stock["Volatility_30"].iloc[-1])
         risk = "Tinggi" if current_vol > 0.03 else "Rendah"
-
-        print("\n=== STOCK FORECAST ===")
-
-        print(f"Ticker           : {ticker}")
-        print(f"Predicted Close  : {pred_close}")
-        print(f"Expected Return  : {return_pct:.2f}%")
-        print(f"Trend            : {trend}")
-        print("======================\n")
 
         return {
             "long_direction": trend,
@@ -183,40 +197,39 @@ class RealLSTMForecastEngine:
             "long_return_pct": round(return_pct, 2),
             "predicted_close": round(pred_close, 2),
         }
-
 # =========================================================
-# USER PROFILE LOADER
+# DYNAMIC KMEANS PREDICTOR FUNCTION (PREDICT REAL-TIME)
 # =========================================================
 
-def load_user_profile(
-    user_id: int,
-    dataset_path: str | Path,
-) -> Dict[str, Any]:
-    """Load profil keuangan dan status investor hasil clustering K-Means."""
-    dataset_path = Path(dataset_path)
+def predict_investor_status(
+    investment_amount: float,
+    debt_to_income_ratio: float,
+    emergency_fund: float,
+    monthly_expense_total: float,
+) -> str:
+    """Prediksi kesiapan finansial secara real-time via model K-Means .pkl"""
+    if not FINANCIAL_KMEANS_PATH.exists() or not FINANCIAL_SCALER_PATH.exists():
+        raise FileNotFoundError("Model KMeans atau Scaler Financial tidak ditemukan di folder models/.")
 
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Dataset keuangan tidak ditemukan: {dataset_path}")
+    kmeans = joblib.load(FINANCIAL_KMEANS_PATH)
+    scaler = joblib.load(FINANCIAL_SCALER_PATH)
 
-    df = pd.read_csv(dataset_path)
+    # Feature engineering mandiri sesuai rumusan training
+    rasio_darurat = (emergency_fund / monthly_expense_total) if monthly_expense_total > 0 else 0
+    score_emergency = min((rasio_darurat / 6) * 40, 40)
 
-    if df.empty:
-        raise ValueError("Dataset keuangan kosong.")
+    X = np.array([[investment_amount, debt_to_income_ratio, score_emergency]])
+    X_scaled = scaler.transform(X)
 
-    user_rows = df[df["user_id"] == user_id]
+    cluster = int(kmeans.predict(X_scaled)[0])
 
-    if user_rows.empty:
-        raise ValueError(f"User ID {user_id} tidak ditemukan di database keuangan.")
-
-    row = user_rows.iloc[-1]
-
-    return {
-        "user_id": int(row["user_id"]),
-        "status_kesiapan_invest": str(row["status_kesiapan_invest"]),
-        "ticker_saham": str(row["ticker_saham"]),
-        "jumlah_lot": int(row["jumlah_lot"]),
-        "average_price": float(row["average_price"]),
+    cluster_mapping = {
+        0: "Siap Investasi (Agresif)",
+        1: "Belum Siap Investasi",
+        2: "Siap Investasi (Konservatif)"
     }
+
+    return cluster_mapping.get(cluster, "Belum Siap Investasi")
 
 # =========================================================
 # FORECAST WRAPPER
@@ -249,9 +262,6 @@ def analyze_portfolio(
     """Menggabungkan status klaster user dan prediksi pasar menjadi sinyal aksi bisnis."""
     ticker = forecast["ticker"]
     
-    # -----------------------------------------------------
-    # EDGE CASE HANDLING: User Belum Memiliki Portofolio
-    # -----------------------------------------------------
     if ticker == "Belum Ada Portfolio" or jumlah_lot == 0:
         return {
             "ticker": ticker,
@@ -267,9 +277,6 @@ def analyze_portfolio(
     action = "HOLD"
     reason = ""
 
-    # =====================================================
-    # CASE A: Konservatif + Bluechip + Trend Positif/Stabil
-    # =====================================================
     if (
         investor_status == "Siap Investasi (Konservatif)"
         and is_bluechip
@@ -278,9 +285,6 @@ def analyze_portfolio(
         action = "HOLD"
         reason = "Kepemilikan saham bluechip sudah sangat sesuai dengan profil manajemen risiko konservatif Anda."
 
-    # =====================================================
-    # CASE B: Konservatif + Saham Volatilitas Tinggi
-    # =====================================================
     elif (
         investor_status == "Siap Investasi (Konservatif)"
         and volatility == "Tinggi"
@@ -291,9 +295,6 @@ def analyze_portfolio(
             "Disarankan untuk melakukan diversifikasi atau mengalihkan modal ke saham kelompok Bluechip."
         )
 
-    # =====================================================
-    # CASE C: Belum Siap Investasi (Kondisi Keuangan Buruk)
-    # =====================================================
     elif investor_status == "Belum Siap Investasi":
         action = "HOLD"
         reason = (
@@ -301,9 +302,6 @@ def analyze_portfolio(
             "Tahan aktivitas trading agresif."
         )
 
-    # =====================================================
-    # CASE D: Agresif (Pengejar Pertumbuhan/Growth-Oriented)
-    # =====================================================
     elif investor_status == "Siap Investasi (Agresif)":
         if trend == "Naik":
             action = "BUY"
@@ -315,9 +313,6 @@ def analyze_portfolio(
             action = "HOLD"
             reason = "Kondisi pergerakan pasar saham sideways. Disarankan menahan aset sembari menunggu konfirmasi breakout arah harga baru."
 
-    # =====================================================
-    # FALLBACK
-    # =====================================================
     else:
         action = "HOLD"
         reason = "Aktivitas pasar normal. Tidak terdeteksi adanya penyimpangan profil atau pola anomali harga saham."
@@ -356,21 +351,29 @@ def generate_financial_advice(status: str) -> str:
     return "Lakukan tinjauan kesehatan cashflow personal secara berkala untuk menjaga stabilitas alokasi finansial."
 
 # =========================================================
-# MAIN ANALYSIS PIPELINE (ORCHESTRATOR)
+# MAIN ANALYSIS PIPELINE (DYNAMIC VERSION)
 # =========================================================
 
 def run_user_analysis(
-    user_id: int,
+    investment_amount: float,
+    debt_to_income_ratio: float,
+    emergency_fund: float,
+    monthly_expense_total: float,
+    ticker: str,
+    jumlah_lot: int,
     engine: Any,
-    dataset_path: str | Path,
 ) -> Dict[str, Any]:
-    """Fungsi pusat penyambung pipeline data dari hulu ke hilir untuk konsumsi API/Frontend."""
-    # 1. Ambil data profil keuangan & instrumen kepemilikan user
-    profile = load_user_profile(user_id=user_id, dataset_path=dataset_path)
-    ticker = profile["ticker_saham"]
-    jumlah_lot = profile["jumlah_lot"]
+    """Fungsi pusat penyambung pipeline data dari hulu ke hilir berbasis input dinamis."""
+    
+    # 1. Hitung status kesiapan investasi secara dinamis lewat KMeans (.pkl)
+    user_status = predict_investor_status(
+        investment_amount=investment_amount,
+        debt_to_income_ratio=debt_to_income_ratio,
+        emergency_fund=emergency_fund,
+        monthly_expense_total=monthly_expense_total,
+    )
 
-    # 2. Logika Pemisahan: Jika user tidak punya portofolio, hindari pemanggilan mesin LSTM
+    # 2. Logika Pemisahan Edge Case
     if ticker == "Belum Ada Portfolio" or jumlah_lot == 0:
         forecast = {
             "ticker": ticker,
@@ -383,57 +386,42 @@ def run_user_analysis(
         # Panggil Real LSTM Model Inference
         forecast = get_stock_forecast(engine=engine, ticker=ticker)
 
-    # 3. Proses hasil analisis portofolio komprehensif
+    # 3. Proses hasil analisa portofolio
     portfolio_result = analyze_portfolio(
-        investor_status=profile["status_kesiapan_invest"],
+        investor_status=user_status,
         forecast=forecast,
         jumlah_lot=jumlah_lot,
     )
 
-    # 4. Bungkus dalam struktur data JSON-friendly
+    # 4. Return format JSON asli tim Vestlytics
     return {
-    "user_status": profile["status_kesiapan_invest"],
-    "stock_forecast": forecast,
-    "portfolio_analysis": [portfolio_result],
-    "financial_advice_text": generate_financial_advice(
-        profile["status_kesiapan_invest"]
-    ),
-}
+        "user_status": user_status,
+        "stock_forecast": forecast,
+        "portfolio_analysis": [portfolio_result],
+        "financial_advice_text": generate_financial_advice(user_status),
+    }
 
 # =========================================================
-# PRODUCTION PIPELINE RUNTIME LOG (MAIN EXECUTION)
+# MAIN TEST LOCAL RUNTIME
 # =========================================================
 
 if __name__ == "__main__":
-    print("Initializing Real LSTM Forecast Engine & Loading Artifacts...")
-    
+    print("Testing Pipeline with Dynamic Local Input...")
     try:
-        # Inisialisasi model deep learning asli dan loader dataset
         real_engine = RealLSTMForecastEngine()
         
-        # User ID target uji coba integrasi dari dataset asli Data Science
-        TARGET_USER_ID = 1584
-        
-        print(f"Executing End-to-End Analysis Pipeline for User ID: {TARGET_USER_ID}...")
-        
-        # Eksekusi fungsi orkestrasi utama
-        final_json_response = run_user_analysis(
-            user_id=TARGET_USER_ID,
-            engine=real_engine,
-            dataset_path=DATASET_KEUANGAN_PATH
+        # Test Object pengganti Data Dummy Lama
+        test_response = run_user_analysis(
+            investment_amount=5000000,
+            debt_to_income_ratio=0.2,
+            emergency_fund=12000000,
+            monthly_expense_total=3000000,
+            ticker="BBCA.JK",
+            jumlah_lot=10,
+            engine=real_engine
         )
-        
-        print("\n================== PIPELINE OUTPUT SUCCESS ==================")
-        print(json.dumps(final_json_response, indent=2, ensure_ascii=False))
-        print("=============================================================")
-        
-    except FileNotFoundError as fnf_err:
-        print(f"\n[Path Error]: {fnf_err}")
-        print("Solusi: Cek kembali penempatan file .keras, .pkl, atau data .csv di laptop Anda.")
-        
-    except ValueError as val_err:
-        print(f"\n[Data/Inference Error]: {val_err}")
-        print("Solusi: Pastikan ticker saham user terdaftar di dalam lq45_feature_engineering.csv.")
-        
-    except Exception as general_err:
-        print(f"\n[Runtime Crash]: {general_err}")
+        print("\n================== LOCAL TEST SUCCESS ==================")
+        print(json.dumps(test_response, indent=2, ensure_ascii=False))
+        print("=========================================================")
+    except Exception as e:
+        print(f"Error test runtime: {str(e)}")
