@@ -5,20 +5,22 @@ import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Mengambil URL Model AI dari environment variable (default: localhost:8000 untuk pengujian lokal)
-const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
+// Menetapkan URL server AI default menggunakan domain Railway untuk environment produksi
+const AI_SERVER_URL =
+  process.env.AI_SERVER_URL ||
+  'https://vestlytics-model-production.up.railway.app';
 
 /**
  * @route   GET /api/consultant/insights
- * @desc    Menghasilkan log insight. Skor dihitung secara manual,
- * teks insight/saran didapat secara dinamis dari Model AI.
+ * @desc    Menghasilkan log wawasan (insight) keuangan. Skor kesehatan dihitung secara internal,
+ * sementara teks wawasan dan status didapatkan melalui Model K-Means AI.
  * @access  Private
  */
 router.get('/insights', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // 1. Mengambil data profil keuangan pengguna langsung dari database (Supabase)
+    // 1. Mengambil data profil keuangan pengguna secara langsung dari database Supabase
     const { data: profile, error } = await supabase
       .from('financial_profiles')
       .select('*')
@@ -26,11 +28,10 @@ router.get('/insights', requireAuth, async (req, res) => {
       .single();
 
     if (error || !profile) {
-      // Jika profil belum ada, kembalikan array log kosong agar UI tidak error
       return res.json({ success: true, data: [] });
     }
 
-    // 2. Kalkulasi Financial Health Score secara MANUAL (Sinkron dengan algoritma Dashboard)
+    // 2. Melakukan kalkulasi Financial Health Score secara internal berdasarkan metrik keuangan pengguna
     const income = profile.monthly_income || 0;
     const expenses = profile.monthly_expenses || 0;
     const emergency = profile.emergency_fund || 0;
@@ -49,41 +50,48 @@ router.get('/insights', requireAuth, async (req, res) => {
       10 + savingsScore + emergScore + debtScore,
     );
 
-    // 3. Menyiapkan Payload dasar (tanpa data aset) untuk dikirim ke Model AI
+    // 3. Menyiapkan payload data yang disesuaikan dengan format endpoint K-Means
     const aiPayload = {
-      ticker: 'BBCA', // Default ticker untuk analisis profil holistik
-      monthly_income: income,
-      monthly_expense_total: expenses,
-      emergency_fund: emergency,
+      // Menggunakan nilai netSavings (sisa kas) sebagai proksi untuk modal investasi apabila data portofolio aset belum tersedia
+      investment_amount: netSavings > 0 ? netSavings : 0,
       debt_to_income_ratio: income > 0 ? debtPayment / income : 0,
+      emergency_fund: emergency,
+      monthly_expense_total: expenses,
     };
 
     let aiInsightText = '';
     let aiTags = [];
 
-    // 4. Meminta teks saran dari AI Engine (FastAPI)
+    // 4. Meminta hasil analisis dan saran rekomendasi dari AI Engine (FastAPI)
     try {
+      // Melakukan permintaan HTTP POST ke endpoint AI untuk mendapatkan financial insight
       const aiResponse = await axios.post(
-        `${AI_SERVER_URL}/predict`,
+        `${AI_SERVER_URL}/api/financial-insight`,
         aiPayload,
         {
-          timeout: 8000, // Batas waktu tunggu agar frontend tidak mengalami freeze
+          timeout: 8000,
         },
       );
 
-      // Mengekstrak insight dari respons model
+      // Mengekstrak wawasan (insight) sesuai dengan struktur respons JSON terbaru dari API AI
+      const aiStatus = aiResponse.data.user_status || 'Unverified';
       aiInsightText =
-        aiResponse.data.insight_text ||
-        aiResponse.data.insight ||
+        aiResponse.data.financial_advice_text ||
         'Data berhasil dianalisis oleh AI.';
-      aiTags = ['AI Generated', `Health Score: ${manualHealthScore}/100`];
+
+      // Menyisipkan hasil klasifikasi K-Means ke dalam label tag untuk ditampilkan pada antarmuka pengguna
+      aiTags = [
+        'AI Consultant',
+        `Status: ${aiStatus}`,
+        `Health Score: ${manualHealthScore}/100`,
+      ];
     } catch (aiErr) {
       console.warn(
-        'Peringatan: AI Engine gagal merespons, menggunakan mode fallback.',
+        'Peringatan: AI Engine gagal merespons, sistem dialihkan ke mode fallback.',
         aiErr.message,
       );
 
-      // 5. Fallback sistem apabila AI gagal dijangkau
+      // 5. Menerapkan sistem fallback apabila AI Engine mengalami kendala koneksi atau batas waktu (timeout)
       aiInsightText = `Berdasarkan kalkulasi sistem, skor kesehatan finansial Anda adalah ${manualHealthScore}/100. ${
         savingsRate < 40
           ? 'Rasio tabungan Anda berada di bawah batas aman. Disarankan untuk menekan pengeluaran bulanan.'
@@ -92,12 +100,12 @@ router.get('/insights', requireAuth, async (req, res) => {
       aiTags = ['System Fallback', `Health Score: ${manualHealthScore}/100`];
     }
 
-    // 6. Format data log insight agar sesuai dengan ekspektasi komponen UI
+    // 6. Memformat data log wawasan agar sesuai dengan struktur yang dibutuhkan oleh komponen UI Frontend
     const insightsData = [
       {
         id: Date.now(),
-        type: 'PORTFOLIO OVERVIEW',
-        title: 'Hasil Analisis AI Consultant',
+        type: 'FINANCIAL INSIGHT', // Tipe log disesuaikan agar relevan dengan konteks analisis finansial makro
+        title: 'Analisis Kesehatan Finansial (AI)',
         description: aiInsightText,
         tags: aiTags,
         timestamp: new Date().toLocaleTimeString('id-ID', {
@@ -112,7 +120,10 @@ router.get('/insights', requireAuth, async (req, res) => {
       data: insightsData,
     });
   } catch (error) {
-    console.error('Kesalahan internal server:', error.message);
+    console.error(
+      'Kesalahan internal server pada modul insight:',
+      error.message,
+    );
     return res
       .status(500)
       .json({ success: false, error: 'Gagal memproses insight portofolio.' });
