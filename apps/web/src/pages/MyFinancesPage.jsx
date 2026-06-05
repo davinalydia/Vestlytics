@@ -39,8 +39,9 @@ const MyFinancesPage = () => {
   const [isLoadingAssets, setIsLoadingAssets] = useState(false);
   const [riskMetrics, setRiskMetrics] = useState(null);
   const [cashflowHistory, setCashflowHistory] = useState([]);
+  const [aiInsight, setAiInsight] = useState(null);
 
-  // Inisialisasi state form profil keuangan
+  // Menginisialisasi state lokal untuk pengelolaan formulir profil keuangan
   const [monthlyIncome, setMonthlyIncome] = useState(
     financialData.monthlyIncome || '',
   );
@@ -60,7 +61,7 @@ const MyFinancesPage = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  // State untuk popup penambahan aset
+  // Mengelola state untuk jendela modal (popup) penambahan aset portofolio
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [newAssetCategory, setNewAssetCategory] = useState('');
   const [newAssetValue, setNewAssetValue] = useState('');
@@ -70,7 +71,7 @@ const MyFinancesPage = () => {
     () => new Date().toISOString().split('T')[0],
   );
 
-  // State untuk popup konfigurasi target
+  // Mengelola state untuk jendela modal (popup) konfigurasi target keuangan
   const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
   const [editingTargetId, setEditingTargetId] = useState(null);
   const [newTargetName, setNewTargetName] = useState('');
@@ -78,6 +79,7 @@ const MyFinancesPage = () => {
   const [newTargetSaved, setNewTargetSaved] = useState('');
   const [newTargetDeadline, setNewTargetDeadline] = useState('');
 
+  // Fungsi utilitas untuk memformat nilai input ke dalam standar Rupiah yang mudah dibaca
   const formatInputVal = (val) => {
     if (
       val === null ||
@@ -107,13 +109,15 @@ const MyFinancesPage = () => {
     }
   }, [financialData]);
 
+  // Memuat data portofolio aset, riwayat arus kas, dan analisis AI saat halaman diinisialisasi
   useEffect(() => {
     const loadFinData = async () => {
       setIsLoadingAssets(true);
       try {
-        const [assetsRes, cashflowRes] = await Promise.all([
+        const [assetsRes, cashflowRes, insightsRes] = await Promise.all([
           api.getAssets(),
           api.getCashflow(),
+          api.getInsights(),
         ]);
 
         if (assetsRes && assetsRes.success) {
@@ -128,8 +132,16 @@ const MyFinancesPage = () => {
         if (cashflowRes && cashflowRes.success) {
           setCashflowHistory(cashflowRes.history || []);
         }
+        if (
+          insightsRes &&
+          insightsRes.success &&
+          insightsRes.data &&
+          insightsRes.data.length > 0
+        ) {
+          setAiInsight(insightsRes.data[0]);
+        }
       } catch (err) {
-        console.error('Gagal memuat data aset:', err);
+        console.error('Terjadi kesalahan saat memuat data finansial:', err);
       } finally {
         setIsLoadingAssets(false);
       }
@@ -137,6 +149,7 @@ const MyFinancesPage = () => {
     loadFinData();
   }, []);
 
+  // Menangani perubahan numerik pada input profil keuangan pengguna
   const handleNumericChange = (value, setter) => {
     const isNegative = value.startsWith('-');
     const cleanNumber = value.replace(/[^0-9]/g, '');
@@ -156,9 +169,7 @@ const MyFinancesPage = () => {
     return isNegative ? -cleanNumber : cleanNumber;
   };
 
-  // ==============================================================================
-  // Pemisahan totalDebtVal dan monthlyDebtPaymentVal untuk keperluan skor lainnya
-  // ==============================================================================
+  // Mengekstraksi nilai input pengguna ke dalam format numerik murni untuk perhitungan
   const incVal = parseCleanNum(monthlyIncome);
   const expVal = parseCleanNum(monthlyExpenses);
   const emergVal = parseCleanNum(emergencyFund);
@@ -169,7 +180,7 @@ const MyFinancesPage = () => {
   const netSavings = incVal - expVal;
   const savingsRate = incVal > 0 ? (netSavings / incVal) * 100 : 0;
 
-  // Menghitung rasio hutang murni menggunakan cicilan per bulan (DTI)
+  // Menghitung Debt-to-Income (DTI) rasio berdasarkan cicilan bulanan
   const debtRatio = incVal > 0 ? (monthlyDebtPaymentVal / incVal) * 100 : 0;
 
   const emergencyTarget = expVal * 6;
@@ -180,7 +191,7 @@ const MyFinancesPage = () => {
   );
 
   const baseAssets = totalAssetsSum > 0 ? totalAssetsSum : emergVal;
-  // Kalkulasi kekayaan bersih murni dikurangi total sisa hutang keseluruhan
+  // Melakukan kalkulasi kekayaan bersih total (Total Aset dikurangi Total Beban Hutang)
   const dynamicNetWorth = baseAssets - totalDebtVal;
   const parsedNetWorth = dynamicNetWorth;
 
@@ -245,8 +256,7 @@ const MyFinancesPage = () => {
     return dateB - dateA;
   });
 
-  // Mengambil skor kesehatan (health score) langsung dari data backend (Context)
-  // untuk memastikan sinkronisasi data antar halaman.
+  // Mengambil skor kesehatan finansial yang dihitung dari backend untuk menjaga sinkronisasi UI
   const healthScore = financialData.healthScore || 0;
   const healthStatusText = financialData.healthStatus || 'Needs improvement';
 
@@ -266,14 +276,16 @@ const MyFinancesPage = () => {
 
       await api.saveProfile(payload);
 
-      // Mengambil ulang data profil, aset, dan arus kas untuk memperbarui metrik secara real-time
-      const [assetsRes, cashflowRes, profileRes] = await Promise.all([
-        api.getAssets(),
-        api.getCashflow(),
-        api.getProfile(),
-      ]);
+      // Memperbarui secara asinkron seluruh metrik analisis setelah data profil disubmit
+      const [assetsRes, cashflowRes, profileRes, insightsRes] =
+        await Promise.all([
+          api.getAssets(),
+          api.getCashflow(),
+          api.getProfile(),
+          api.getInsights(),
+        ]);
 
-      // Menangkap skor kesehatan terbaru dari respons backend
+      // Menyesuaikan status dan skor kesehatan terbaru
       let newHealthScore = financialData.healthScore;
       let newHealthStatus = financialData.healthStatus;
 
@@ -298,9 +310,17 @@ const MyFinancesPage = () => {
         setRiskMetrics(assetsRes.risk_metrics);
       if (cashflowRes && cashflowRes.success)
         setCashflowHistory(cashflowRes.history || []);
+      if (
+        insightsRes &&
+        insightsRes.success &&
+        insightsRes.data &&
+        insightsRes.data.length > 0
+      ) {
+        setAiInsight(insightsRes.data[0]);
+      }
 
       setSuccessMsg(
-        'Profil keuangan berhasil disimpan & analisis AI telah diaktifkan!',
+        'Profil keuangan berhasil disimpan & wawasan analisis AI telah diperbarui!',
       );
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
@@ -316,20 +336,23 @@ const MyFinancesPage = () => {
       await api.deleteCashflow(id);
       setCashflowHistory((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
-      console.error('Gagal menghapus riwayat:', err);
+      console.error('Terjadi kendala saat menghapus riwayat arus kas:', err);
     }
   };
 
   const handleResetCashflow = async () => {
     const isConfirm = window.confirm(
-      'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas? Data tidak dapat dipulihkan.',
+      'Apakah Anda yakin ingin menghapus seluruh riwayat arus kas secara permanen?',
     );
     if (isConfirm) {
       try {
         await api.resetCashflow();
         setCashflowHistory([]);
       } catch (err) {
-        console.error('Gagal mereset riwayat:', err);
+        console.error(
+          'Terjadi kendala saat melakukan reset riwayat arus kas:',
+          err,
+        );
       }
     }
   };
@@ -348,7 +371,10 @@ const MyFinancesPage = () => {
         if (assetsRes.risk_metrics) setRiskMetrics(assetsRes.risk_metrics);
       }
     } catch (error) {
-      console.error('Gagal menghapus aset dari backend:', error);
+      console.error(
+        'Terjadi kegagalan komunikasi saat menghapus aset di server:',
+        error,
+      );
     }
   };
 
@@ -376,7 +402,10 @@ const MyFinancesPage = () => {
         addAssetCategory(newAsset);
       }
     } catch (error) {
-      console.error('Gagal menyimpan aset ke backend:', error);
+      console.error(
+        'Terjadi kendala operasional saat mengunggah aset ke server:',
+        error,
+      );
       addAssetCategory(newAsset);
     }
 
@@ -435,7 +464,7 @@ const MyFinancesPage = () => {
 
   return (
     <div className='finances-container animate-fade-in'>
-      {/* Tombol Pemilih Tab (Tab Switcher) */}
+      {/* Tombol Navigasi Konteks Halaman (Tab Switcher) */}
       <div className='tabs-container'>
         <button
           className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -455,7 +484,7 @@ const MyFinancesPage = () => {
         <div className='profile-grid'>
           {/* Kolom Kiri */}
           <div className='flex-col-gap'>
-            {/* Formulir Profil Keuangan Utama */}
+            {/* Struktur Formulir Pembaruan Profil Keuangan */}
             <div className='dash-card'>
               <div className='dash-card-header'>
                 <h3 className='dash-card-title'>Financial Profile</h3>
@@ -627,7 +656,7 @@ const MyFinancesPage = () => {
               </div>
             </div>
 
-            {/* Riwayat Arus Kas Bulanan */}
+            {/* Riwayat Tabulasi Arus Kas Bulanan */}
             <div className='dash-card dark'>
               <div
                 className='dash-card-header items-center'
@@ -650,7 +679,7 @@ const MyFinancesPage = () => {
                     border: '1px solid #ef4444',
                     cursor: 'pointer',
                   }}
-                  title='Reset seluruh riwayat'
+                  title='Reset keseluruhan arsip riwayat data'
                 >
                   <RotateCcw size={12} /> Reset Table
                 </button>
@@ -709,7 +738,7 @@ const MyFinancesPage = () => {
                               <button
                                 onClick={() => handleDeleteCashflow(row.id)}
                                 className='text-slate-500 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 transition-colors inline-block'
-                                title='Hapus Riwayat'
+                                title='Menghapus log arsip terpilih'
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -723,7 +752,8 @@ const MyFinancesPage = () => {
                           colSpan='6'
                           className='text-center text-slate-500 py-4'
                         >
-                          Belum ada riwayat arus kas.
+                          Sistem belum mencatat adanya riwayat arus kas yang
+                          tervalidasi.
                         </td>
                       </tr>
                     )}
@@ -736,7 +766,7 @@ const MyFinancesPage = () => {
           {/* Kolom Kanan */}
           <div className='flex-col-gap'>
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-              {/* Widget Pelacak Kesehatan Finansial */}
+              {/* Komponen Visualisasi Indikator Kesehatan Finansial */}
               <div className='dash-card dark'>
                 <h3 className='dash-card-title text-white mb-6'>
                   Financial Health Tracker
@@ -841,7 +871,7 @@ const MyFinancesPage = () => {
                 </div>
               </div>
 
-              {/* Widget Skor Kesehatan (Lingkaran) */}
+              {/* Tampilan Numerik Skor Kesehatan Keseluruhan */}
               <div className='dash-card dark health-score-card'>
                 <h3 className='dash-card-title text-white w-full text-left mb-6'>
                   Health score
@@ -905,7 +935,7 @@ const MyFinancesPage = () => {
             </div>
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-              {/* Daftar Target Finansial */}
+              {/* Seksi Implementasi Daftar Tujuan Pembiayaan (Financial Targets) */}
               <div className='dash-card dark flex-1'>
                 <div
                   className='dash-card-header items-center'
@@ -960,14 +990,14 @@ const MyFinancesPage = () => {
                         <button
                           onClick={() => handleEditTarget(target)}
                           className='text-slate-400 hover:text-sky-400 bg-transparent border-none cursor-pointer p-0'
-                          title='Edit target'
+                          title='Mengubah detail target referensi'
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => deleteFinancialTarget(target.id)}
                           className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-0'
-                          title='Delete target'
+                          title='Menghapus target dari daftar pemantauan'
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1005,12 +1035,12 @@ const MyFinancesPage = () => {
                 {(!financialData.financialTargets ||
                   financialData.financialTargets.length === 0) && (
                   <div className='text-center text-slate-500 py-4 text-sm'>
-                    Belum ada target keuangan yang disetel.
+                    Belum terdapat target keuangan yang disetel ke dalam sistem.
                   </div>
                 )}
               </div>
 
-              {/* Kotak Wawasan Konsultan AI */}
+              {/* Area Penyajian Rekomendasi Algoritmik dari AI (Konsultan Wawasan Dinamis) */}
               <div
                 className='dash-card flex-1'
                 style={{
@@ -1024,23 +1054,35 @@ const MyFinancesPage = () => {
                     className='dash-card-title'
                     style={{ color: '#a855f7', margin: 0 }}
                   >
-                    AI Insight
+                    AI Consultant Insight
                   </h3>
                   <Sparkles className='text-[#a855f7]' size={16} />
                 </div>
-                <p className='text-sm text-slate-800 leading-relaxed'>
-                  Your emergency fund is currently at{' '}
-                  {(emergVal / (expVal > 0 ? expVal : 1)).toFixed(1)} months'
-                  worth of expenses. The ideal standard target is 6 months,
-                  which requires a total of Rp{' '}
-                  {emergencyTarget.toLocaleString('id-ID')}.
-                  {savingsRate < 40
-                    ? ' Try allocating an additional 15% of your income to accelerate this goal.'
-                    : ' Excellent savings rate! You are in a secure position to gradually DCA into other assets.'}
-                  {debtRatio > 30
-                    ? ' Caution: Your debt ratio is high - prioritize paying off debt first.'
-                    : ' Your debt ratio is within safe parameters.'}
-                </p>
+
+                {isSubmitting || isLoadingAssets ? (
+                  <SkeletonLoader type='text' rows={3} />
+                ) : (
+                  <div className='flex flex-col gap-3'>
+                    <p className='text-sm text-slate-800 leading-relaxed m-0'>
+                      {aiInsight
+                        ? aiInsight.description
+                        : 'Sistem sedang menganalisis profil Anda. Silakan isi dan simpan data keuangan untuk mendapatkan wawasan terbaru.'}
+                    </p>
+
+                    {aiInsight && aiInsight.tags && (
+                      <div className='flex flex-wrap gap-2 mt-1'>
+                        {aiInsight.tags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className='bg-purple-100 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider'
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1057,7 +1099,7 @@ const MyFinancesPage = () => {
           </div>
         ) : (
           <div className='assets-grid animate-fade-in'>
-            {/* Baris Atas: Visualisasi Donut Chart */}
+            {/* Area Penyajian Grafik Lingkaran (Donut Chart) Agregasi Aset */}
             <div className='dash-card'>
               <div className='dash-card-header'>
                 <div>
@@ -1121,6 +1163,7 @@ const MyFinancesPage = () => {
               )}
             </div>
 
+            {/* Rekapitulasi Matriks Risiko Portofolio Tingkat Lanjut */}
             <div className='dash-card dark flex flex-col justify-center'>
               <h3 className='dash-card-title text-white mb-6'>
                 Portfolio Risk Metrics
@@ -1184,7 +1227,7 @@ const MyFinancesPage = () => {
               )}
             </div>
 
-            {/* Tabel Detail Aset */}
+            {/* Tabulasi Ekstensif Mengenai Rincian Kategori Aset Terdaftar */}
             <div className='dash-card' style={{ gridColumn: '1 / -1' }}>
               <div
                 className='dash-card-header items-center'
@@ -1284,7 +1327,7 @@ const MyFinancesPage = () => {
                               <button
                                 onClick={() => handleDeleteAssetBackend(row)}
                                 className='text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer p-1 flex items-center justify-center transition-colors inline-block'
-                                title='Delete Category'
+                                title='Menghapus kategori aset yang terhubung ke server'
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -1300,7 +1343,7 @@ const MyFinancesPage = () => {
           </div>
         ))}
 
-      {/* Modal Penambahan Aset */}
+      {/* Tampilan antarmuka dialog modal untuk pengisian spesifikasi aset baru */}
       <Modal
         isOpen={isAssetModalOpen}
         onClose={() => setIsAssetModalOpen(false)}
@@ -1447,7 +1490,7 @@ const MyFinancesPage = () => {
                 try {
                   e.target.showPicker();
                 } catch {
-                  // Fallback jika API browser tidak mendukung showPicker()
+                  // Fallback fungsionalitas kalender di perangkat tanpa dukungan penuh
                 }
               }}
             />
@@ -1475,7 +1518,7 @@ const MyFinancesPage = () => {
         </div>
       </Modal>
 
-      {/* Modal Konfigurasi (Tambah & Edit) Target Keuangan */}
+      {/* Tampilan antarmuka dialog modal untuk pengubahan batas target investasi portofolio */}
       <Modal
         isOpen={isTargetModalOpen}
         onClose={() => setIsTargetModalOpen(false)}
@@ -1639,7 +1682,7 @@ const MyFinancesPage = () => {
                 try {
                   e.target.showPicker();
                 } catch {
-                  // Fallback jika API browser tidak mendukung showPicker()
+                  // Menyediakan cadangan pemilihan elemen kalender
                 }
               }}
             />

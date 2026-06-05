@@ -24,10 +24,11 @@ const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(financialData.isProfileCompleted);
   const [profile, setProfile] = useState(null);
   const [cashflow, setCashflow] = useState([]);
+  const [aiInsight, setAiInsight] = useState(null);
 
   const assets = financialData.assetsList || [];
 
-  // Memuat data ringkasan dashboard dari backend
+  // Mengambil agregasi data metrik dasbor dan wawasan AI dari server
   useEffect(() => {
     if (!financialData.isProfileCompleted) {
       return;
@@ -36,9 +37,10 @@ const DashboardPage = () => {
     const loadDashboardData = async () => {
       setIsLoading(true);
       try {
-        const [profileRes, cashflowRes] = await Promise.all([
+        const [profileRes, cashflowRes, insightsRes] = await Promise.all([
           api.getProfile(),
           api.getCashflow(),
+          api.getInsights(),
         ]);
 
         if (profileRes && profileRes.success) {
@@ -47,8 +49,17 @@ const DashboardPage = () => {
         if (cashflowRes && cashflowRes.success) {
           setCashflow(cashflowRes.history || []);
         }
+        if (
+          insightsRes &&
+          insightsRes.success &&
+          insightsRes.data &&
+          insightsRes.data.length > 0
+        ) {
+          // Mengambil log insight terbaru yang dihasilkan oleh AI Engine
+          setAiInsight(insightsRes.data[0]);
+        }
       } catch (err) {
-        console.error('Gagal memuat data dashboard:', err);
+        console.error('Terjadi kesalahan saat memuat data dasbor:', err);
       } finally {
         setIsLoading(false);
       }
@@ -57,19 +68,19 @@ const DashboardPage = () => {
     loadDashboardData();
   }, [financialData.isProfileCompleted]);
 
-  // Jika profil belum lengkap, tampilkan layar panduan pengisian (onboarding fallback)
+  // Menampilkan antarmuka panduan (onboarding) apabila profil pengguna belum lengkap
   if (!financialData.isProfileCompleted) {
     return <OnboardingFallback pageName='Dashboard' />;
   }
 
-  // Fungsi pembantu untuk memformat nilai string menjadi angka murni
+  // Fungsi utilitas untuk mengekstraksi nilai numerik murni dari format string
   const parseNum = (val) => {
     if (!val) return 0;
     const cleaned = String(val).replace(/[^0-9]/g, '');
     return parseInt(cleaned, 10) || 0;
   };
 
-  // Mengekstrak nilai profil finansial dari Context global
+  // Mengonversi variabel profil finansial dari state global untuk keperluan visualisasi
   const incomeVal = parseNum(financialData.monthlyIncome);
   const expenseVal = parseNum(financialData.monthlyExpenses);
   const debtVal = parseNum(financialData.totalDebt);
@@ -78,14 +89,15 @@ const DashboardPage = () => {
   const savingsRate = incomeVal > 0 ? (netSavingsVal / incomeVal) * 100 : 0;
   const debtRatio = incomeVal > 0 ? (debtVal / incomeVal) * 100 : 0;
 
-  // Menghitung total nilai portofolio investasi saat ini
+  // Melakukan kalkulasi total valuasi portofolio berdasarkan data aset saat ini
   const totalAssetValue = assets.reduce(
     (sum, item) => sum + parseFloat(item.value || 0),
     0,
   );
-  const investedValue = totalAssetValue > 0 ? totalAssetValue * 0.95 : 0; // Asumsi margin profit keseluruhan 5%
+  // Asumsi margin kontribusi aset dasar sebesar 95% untuk ilustrasi investasi tertanam (invested value)
+  const investedValue = totalAssetValue > 0 ? totalAssetValue * 0.95 : 0;
 
-  // Memetakan data aset ke dalam format grafik persentase (Pie Chart)
+  // Memetakan struktur data aset ke dalam format visualisasi grafik lingkaran (Pie Chart)
   const pieData =
     assets.length > 0
       ? assets.map((item, idx) => {
@@ -109,12 +121,11 @@ const DashboardPage = () => {
         })
       : [{ name: 'Belum ada aset', value: 100, color: '#334155' }];
 
-  // Mengambil healthScore dan status terpusat dari context global
+  // Mengambil indikator skor kesehatan finansial yang tersinkronisasi dari state global
   const healthScore = financialData.healthScore || 0;
   const healthStatus = financialData.healthStatus || 'Needs improvement';
 
-  // Mengonversi data riwayat arus kas dari backend ke format grafik batang (Bar Chart)
-  // Data dibalik (reverse) agar grafik menampilkan kronologi waktu dari kiri (terlama) ke kanan (terbaru)
+  // Menyusun struktur data arus kas historis untuk divisualisasikan dalam grafik batang (Bar Chart)
   const barData =
     cashflow && cashflow.length > 0
       ? [...cashflow].reverse().map((item) => ({
@@ -415,7 +426,7 @@ const DashboardPage = () => {
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Label teks di tengah lingkaran */}
+                  {/* Label teks terpusat pada grafik lingkaran */}
                   <div className='absolute inset-0 flex flex-col items-center justify-center pointer-events-none'>
                     <span className='text-3xl font-bold text-slate-800'>
                       {assets.length}
@@ -446,7 +457,7 @@ const DashboardPage = () => {
             )}
           </div>
 
-          {/* Indikator Pelacak Kesehatan Finansial */}
+          {/* Indikator Metrik Kesehatan Finansial Utama */}
           <div className='dash-card dark'>
             <h3 className='dash-card-title text-white mb-6'>
               Financial Health Tracker
@@ -543,19 +554,33 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          {/* Kotak Kesimpulan (AI Insight) */}
+          {/* Kotak Kesimpulan Dinamis dari AI Engine */}
           <div className='dash-card' style={{ padding: '1.25rem' }}>
             <div className='flex items-center gap-2 mb-3'>
-              <h3 className='dash-card-title'>Investment Insight</h3>
+              <h3 className='dash-card-title'>Financial AI Insight</h3>
               <Sparkles size={16} className='text-yellow-500' />
             </div>
             {isLoading ? (
-              <SkeletonLoader type='text' rows={2} />
+              <SkeletonLoader type='text' rows={3} />
             ) : (
-              <div className='ai-insight-box'>
-                {savingsRate < 40
-                  ? 'Your savings ratio is below the safe threshold of 40%. It is recommended to reduce monthly expenses and hold current positions to maintain healthy cashflow reserves.'
-                  : 'Your savings ratio is in an excellent range. Your risk match is perfectly aligned. Consider gradual Dollar-Cost-Averaging (DCA) into Stocks or Gold segments.'}
+              <div className='ai-insight-box flex flex-col gap-3'>
+                <p className='text-sm text-slate-700 leading-relaxed m-0'>
+                  {aiInsight
+                    ? aiInsight.description
+                    : 'Belum ada wawasan AI yang dapat ditampilkan. Silakan perbarui profil keuangan Anda.'}
+                </p>
+                {aiInsight && aiInsight.tags && (
+                  <div className='flex flex-wrap gap-2 mt-1'>
+                    {aiInsight.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className='bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider'
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
