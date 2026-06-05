@@ -124,6 +124,16 @@ const AIConsultantPage = () => {
       };
     }
 
+    if (cleanType === 'FINANCIAL INSIGHT') {
+      return {
+        className:
+          'border-l-4 border-l-blue-500 bg-blue-50/40 hover:bg-blue-50/60 border border-slate-200',
+        icon: <Sparkles size={20} className='text-blue-600' />,
+        iconBg: 'bg-blue-100',
+        badgeClass: 'blue', // Pastiin di CSS lo ada styling buat badge warna biru ya
+      };
+    }
+
     // Properti default untuk wawasan ringkasan (Overview / Health)
     return {
       className:

@@ -45,14 +45,16 @@ const MOCK_DATA = {
   ],
   insights: [
     {
-      id: 'ins-1',
-      category: 'Risk Warning',
-      title: 'Konsentrasi Portofolio',
+      id: Date.now(),
+      type: 'FINANCIAL INSIGHT',
+      title: 'Analisis Kesehatan Finansial (Fallback)',
       description:
-        'Sebagian besar aset Anda berada di sektor saham. Pertimbangkan diversifikasi untuk meminimalisir volatilitas.',
-      impact: 'High',
-      action_link: '/strategy-lab',
-      action_text: 'Simulasikan Diversifikasi',
+        'Server AI sedang sibuk. Pastikan pengeluaran Anda tidak melebihi pemasukan dan selalu sediakan dana darurat yang cukup.',
+      tags: ['System Fallback', 'Status: Offline'],
+      timestamp: new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     },
   ],
 };
