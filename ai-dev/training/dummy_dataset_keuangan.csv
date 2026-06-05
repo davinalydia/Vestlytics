@@ -1,0 +1,4 @@
+user_id,status_kesiapan_invest,ticker_saham,jumlah_lot,average_price
+1,Siap Investasi (Konservatif),BBCA.JK,20,9500
+2,Siap Investasi (Agresif),ADRO.JK,15,2200
+3,Belum Siap Investasi,TINS.JK,10,1700

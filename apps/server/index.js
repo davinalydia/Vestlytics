@@ -5,7 +5,7 @@
   // Mengimpor semua modul rute API yang telah dibuat
   import portfolioRoutes from './routes/portfolio.js';
   import marketRoutes from './routes/market.js';
-  import consultantRoutes from './routes/dummyInsight.js';
+  import consultantRoutes from './routes/insight.js';
   import labRoutes from './routes/lab.js';
   import authRoutes from './routes/auth.js';
 
